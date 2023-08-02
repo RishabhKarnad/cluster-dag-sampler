@@ -1,0 +1,134 @@
+import numpy as np
+from sympy.functions.combinatorial.numbers import stirling
+
+
+class ScoreCIC:
+    def __init__(self, data, dist):
+        m, n = data.shape
+        self._dist = dist
+        self.dist = dist(n_vars=n)
+        self.dist.fit(data)
+        self.N = m
+
+    # def total_correlation(self, K_i):
+    #     dist_marginal_k_i = self.dist.marginal(dims=K_i)
+
+    #     cov_indep = np.diag(np.diag(dist_marginal_k_i.cov))
+    #     dist_indep = self._dist(
+    #         n_vars=len(K_i), mean=dist_marginal_k_i.mean, cov=cov_indep)
+
+    #     return self._dist.kl_div(dist_marginal_k_i, dist_indep)
+
+    def total_correlation_all(self, G_C):
+        C, _ = G_C
+        return np.sum([self.dist.total_correlation(K_i) for K_i in C])
+
+    # def g2_local(self, G_C, K_i, parents):
+    #     dims_combined = np.hstack([K_i, parents])
+
+    #     dist_joint = self.dist.marginal(dims=dims_combined)
+
+    #     dist_k_i = self.dist.marginal(dims=K_i)
+    #     dist_pa_i = self.dist.marginal(dims=parents)
+
+    #     mean_indep = np.hstack(
+    #         [dist_k_i.mean, dist_pa_i.mean])
+    #     cov_indep = np.diag(
+    #         np.hstack([np.diag(dist_k_i.cov), np.diag(dist_pa_i.cov)]))
+    #     dist_indep = self._dist(
+    #         n_vars=dims_combined.size, mean=mean_indep, cov=cov_indep)
+
+    #     return self._dist.kl_div(dist_joint, dist_indep)
+
+    def g2(self, G_C):
+        C, E_C = G_C
+        g2_score = 0
+        for i, K_i in enumerate(C):
+            parent_indices = E_C[:, i].nonzero()[0]
+            if parent_indices.size > 0:
+                parents = np.hstack([C[j] for j in parent_indices])
+                g2_score += self.dist.group_mutual_information(
+                    K_i, parents)
+
+        return g2_score
+
+    # def mutual_information(self, i, j):
+    #     dist_joint = self.dist.marginal(dims=np.array([i, j]))
+
+    #     dist_i = self.dist.marginal(dims=[i])
+    #     dist_j = self.dist.marginal(dims=[j])
+
+    #     mean_indep = np.hstack(
+    #         [dist_i.mean, dist_j.mean])
+    #     cov_indep = np.diag(
+    #         np.hstack([np.diag(dist_i.cov), np.diag(dist_j.cov)]))
+    #     dist_indep = self._dist(
+    #         n_vars=mean_indep.size, mean=mean_indep, cov=cov_indep)
+
+    #     return self._dist.kl_div(dist_joint, dist_indep)
+
+    def pairwise_MI(self, G_C, K_i, parents):
+        mi = 0
+
+        for i in K_i:
+            for j in parents:
+                mi += self.dist.mutual_information(i, j)
+
+        return mi
+
+    def pairwise_MI_all(self, G_C):
+        C, E_C = G_C
+
+        pairwise_MI = 0
+
+        for i, K_i in enumerate(C):
+            parent_indices = E_C[:, i].nonzero()[0]
+            if parent_indices.size > 0:
+                parents = np.hstack([C[j] for j in parent_indices])
+                pairwise_MI += self.pairwise_MI(G_C, K_i, parents)
+
+        return pairwise_MI
+
+    def penalty(self, G_C):
+        C, _ = G_C
+
+        m = len(C)
+        log_m = np.log2(m)
+
+        return (stirling(self.dist.n_vars, len(C))
+                + np.sum([log_m*len(K_i) for K_i in C]))
+
+    def __call__(self, G_C, *, penalize_complexity=True):
+        penalty = self.penalty(G_C) if penalize_complexity else 0
+        N = self.N
+        return (2 * N * (self.total_correlation_all(G_C) + self.g2(G_C) - self.pairwise_MI_all(G_C))
+                - (np.log2(N) * penalty / 2))
+
+
+def test():
+    K = [[0, 1, 2], [3], [4]]
+    G = np.array([[0, 1, 1],
+                  [0, 0, 1],
+                  [0, 0, 0]])
+    G_C = (K, G)
+
+    data = generate_data_continuous(n_samples=100, n_dims=5)
+    score_CIC = ScoreCIC(data=data, dist=GaussianDistribution)
+
+    # data = generate_data_discrete(n_samples=100)
+    # score_CIC = ScoreCIC(data=data, dist=MultivariateBernoulliDistribution)
+
+    score = score_CIC(G_C)
+    print(f'CIC            : {score}')
+    print(f'  TC           : {score_CIC.total_correlation_all(G_C)}')
+    print(f'  G2 score     : {score_CIC.g2(G_C)}')
+    print(f'  Pairwise MI  : {score_CIC.pairwise_MI_all(G_C)}')
+    print(f'  Penalty      : {score_CIC.penalty(G_C)}')
+
+
+if __name__ == '__main__':
+    from data import generate_data_continuous, generate_data_discrete
+    from models.gaussian import GaussianDistribution
+    from models.bernoulli import MultivariateBernoulliDistribution
+
+    test()
