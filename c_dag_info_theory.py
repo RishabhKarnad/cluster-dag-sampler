@@ -2,6 +2,7 @@ from copy import deepcopy
 
 import numpy as np
 import scipy.stats as stats
+from tqdm import tqdm
 
 
 def sample_clustering(n_dims):
@@ -49,19 +50,14 @@ def get_neighbours(G_C):
                 G_n[i, j] = 1
                 neighbours.append((deepcopy(C), G_n))
 
+    return neighbours
+
 
 def greedy_search(G_C, dataset, score):
-    # G_C_prime = G_C
-    # score = score(G_C_prime, dataset)
-    # neighbours = neighbourhood(G_C_prime)
-    # for G_C_neighbour in neighbours:
-    #     score_neighbour = score(G_C_neighbour, dataset)
-    #     if score_neighbour > score:
-    #         G_C_prime = G_C_neighbour
-    #         score = score_neighbour
-    # return G_C_prime
     neighbours = get_neighbours(G_C)
     scores = [score(G_n) for G_n in neighbours]
+    if len(scores) == 0:
+        return G_C
     return neighbours[np.argmax(scores)]
 
 
@@ -71,10 +67,10 @@ def find_cdag(data, *, score, steps=100, rho=0.5):
     G_star = sample_cdag(C_star, rho)
     score_G = score(G_star)
 
-    for _ in range(steps):
+    for _ in tqdm(range(steps)):
         C = sample_clustering(n)
         G_C = sample_cdag(C, rho)
-        G_prime = greedy_search(G_C)
+        G_prime = greedy_search(G_C, data, score)
         score_new = score(G_prime)
         if score_new > score_G:
             G_star = G_prime

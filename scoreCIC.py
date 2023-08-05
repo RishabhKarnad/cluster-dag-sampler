@@ -10,35 +10,9 @@ class ScoreCIC:
         self.dist.fit(data)
         self.N = m
 
-    # def total_correlation(self, K_i):
-    #     dist_marginal_k_i = self.dist.marginal(dims=K_i)
-
-    #     cov_indep = np.diag(np.diag(dist_marginal_k_i.cov))
-    #     dist_indep = self._dist(
-    #         n_vars=len(K_i), mean=dist_marginal_k_i.mean, cov=cov_indep)
-
-    #     return self._dist.kl_div(dist_marginal_k_i, dist_indep)
-
     def total_correlation_all(self, G_C):
         C, _ = G_C
-        return np.sum([self.dist.total_correlation(K_i) for K_i in C])
-
-    # def g2_local(self, G_C, K_i, parents):
-    #     dims_combined = np.hstack([K_i, parents])
-
-    #     dist_joint = self.dist.marginal(dims=dims_combined)
-
-    #     dist_k_i = self.dist.marginal(dims=K_i)
-    #     dist_pa_i = self.dist.marginal(dims=parents)
-
-    #     mean_indep = np.hstack(
-    #         [dist_k_i.mean, dist_pa_i.mean])
-    #     cov_indep = np.diag(
-    #         np.hstack([np.diag(dist_k_i.cov), np.diag(dist_pa_i.cov)]))
-    #     dist_indep = self._dist(
-    #         n_vars=dims_combined.size, mean=mean_indep, cov=cov_indep)
-
-    #     return self._dist.kl_div(dist_joint, dist_indep)
+        return np.sum([self.dist.total_correlation(list(K_i)) for K_i in C])
 
     def g2(self, G_C):
         C, E_C = G_C
@@ -46,26 +20,11 @@ class ScoreCIC:
         for i, K_i in enumerate(C):
             parent_indices = E_C[:, i].nonzero()[0]
             if parent_indices.size > 0:
-                parents = np.hstack([C[j] for j in parent_indices])
+                parents = np.hstack([list(C[j]) for j in parent_indices])
                 g2_score += self.dist.group_mutual_information(
-                    K_i, parents)
+                    list(K_i), parents)
 
         return g2_score
-
-    # def mutual_information(self, i, j):
-    #     dist_joint = self.dist.marginal(dims=np.array([i, j]))
-
-    #     dist_i = self.dist.marginal(dims=[i])
-    #     dist_j = self.dist.marginal(dims=[j])
-
-    #     mean_indep = np.hstack(
-    #         [dist_i.mean, dist_j.mean])
-    #     cov_indep = np.diag(
-    #         np.hstack([np.diag(dist_i.cov), np.diag(dist_j.cov)]))
-    #     dist_indep = self._dist(
-    #         n_vars=mean_indep.size, mean=mean_indep, cov=cov_indep)
-
-    #     return self._dist.kl_div(dist_joint, dist_indep)
 
     def pairwise_MI(self, G_C, K_i, parents):
         mi = 0
@@ -84,8 +43,8 @@ class ScoreCIC:
         for i, K_i in enumerate(C):
             parent_indices = E_C[:, i].nonzero()[0]
             if parent_indices.size > 0:
-                parents = np.hstack([C[j] for j in parent_indices])
-                pairwise_MI += self.pairwise_MI(G_C, K_i, parents)
+                parents = np.hstack([list(C[j]) for j in parent_indices])
+                pairwise_MI += self.pairwise_MI(G_C, list(K_i), parents)
 
         return pairwise_MI
 
