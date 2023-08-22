@@ -4,11 +4,15 @@ from scipy.special import rel_entr
 
 
 class MultivariateBernoulliDistribution:
-    def __init__(self, n_vars=1):
+    def __init__(self, n_vars=1, params=None):
         self.n_vars = n_vars
-        self.params = np.empty(tuple(2*np.ones(n_vars, dtype='int')))
-        support = self.params.size
-        self.params.fill(1/support)
+
+        if params is not None:
+            self.params = params
+        else:
+            self.params = np.empty(tuple(2*np.ones(n_vars, dtype='int')))
+            support = self.params.size
+            self.params.fill(1/support)
 
     def make_dist(self, params):
         params = params.flatten()
@@ -21,6 +25,8 @@ class MultivariateBernoulliDistribution:
 
     def fit(self, data):
         m, n = data.shape
+
+        self.params = np.zeros(tuple(2*np.ones(self.n_vars, dtype='int')))
 
         if n != self.n_vars:
             raise RuntimeError(
@@ -35,7 +41,10 @@ class MultivariateBernoulliDistribution:
         return self.dist().pdf(idx)
 
     def sample(self, n_samples):
-        return self.dist().rvs(n_samples)
+        samples_int = self.dist().rvs(size=n_samples)
+        support = self.n_vars
+        return np.array([list(map(int, list(format(sample, f'0{support}b'))))
+                         for sample in samples_int])
 
     def marginal(self, *, dims):
         dims_rest = list(set(range(self.n_vars)).difference(set(dims)))
@@ -46,7 +55,10 @@ class MultivariateBernoulliDistribution:
         return self.marginal(dims=dims).pdf(sample)
 
     def sample_marginal(self, n_samples, *, dims):
-        return self.marginal(dims=dims).rvs(n_samples)
+        samples_int = self.marginal(dims=dims).rvs(size=n_samples)
+        support = len(dims)
+        return np.array([list(map(int, list(format(sample, f'0{support}b'))))
+                         for sample in samples_int])
 
     def prob_condtional(self, sample, *, dims, dims_conditioned):
         raise NotImplementedError()
@@ -55,6 +67,7 @@ class MultivariateBernoulliDistribution:
         raise NotImplementedError()
 
     def total_correlation(self, dims):
+        dims = sorted(dims)
         dist_marginal = self.marginal(dims=dims)
         marginal_pmfs = [self.marginal(dims=[i]).pk for i in dims]
         params = marginal_pmfs[0]
@@ -74,7 +87,12 @@ class MultivariateBernoulliDistribution:
         elif isinstance(K_j, np.ndarray):
             K_j = list(K_j)
 
-        dist_marginal = self.marginal(dims=(K_i+K_j))
+        K_i = sorted(K_i)
+        K_j = sorted(K_j)
+        if K_i[0] > K_j[0]:
+            K_i, K_j = K_j, K_i
+        dims_combined = K_i+K_j
+        dist_marginal = self.marginal(dims=(dims_combined))
         marginal_i, marginal_j = (
             self.marginal(dims=K_i).pk, self.marginal(dims=K_j).pk)
         params = np.multiply.outer(marginal_i, marginal_j)
@@ -82,6 +100,8 @@ class MultivariateBernoulliDistribution:
         return MultivariateBernoulliDistribution.kl_div(dist_marginal, dist_indep)
 
     def mutual_information(self, i, j):
+        if i > j:
+            i, j = j, i
         dist_marginal = self.marginal(dims=[i, j])
         marginal_i, marginal_j = (
             self.marginal(dims=[i]).pk, self.marginal(dims=[j]).pk)
@@ -103,27 +123,49 @@ class MultivariateBernoulliDistribution:
             raise RuntimeError(
                 f'Size of support of distributions do not match: {p_pdf.size} and {q_pdf.size}')
 
-        return stats.entropy(p_pdf, q_pdf)
+        return np.sum(p_pdf * np.log2(p_pdf / q_pdf))
 
 
 def test():
-    g1 = MultivariateBernoulliDistribution(
-        n_vars=1)
-    g2 = MultivariateBernoulliDistribution(
-        n_vars=1)
-    print(MultivariateBernoulliDistribution.kl_div(g1, g2))
+    dist1 = MultivariateBernoulliDistribution(n_vars=2, params=np.array([[0.25, 0.25],
+                                                                         [0.25, 0.25]]))
+    tc = dist1.total_correlation(dims=[0, 1])
+    assert (tc == 0.0)
 
-    g1 = MultivariateBernoulliDistribution(
-        n_vars=2)
-    g2 = MultivariateBernoulliDistribution(
-        n_vars=2)
-    print(MultivariateBernoulliDistribution.kl_div(g1, g2))
+    dist2 = MultivariateBernoulliDistribution(n_vars=2, params=np.array([[0.125, 0.375],
+                                                                         [0.125, 0.375]]))
+    tc = dist2.total_correlation(dims=[0, 1])
+    assert (tc == 0.0)
 
-    g1 = MultivariateBernoulliDistribution(
-        n_vars=1)
-    g2 = MultivariateBernoulliDistribution(
-        n_vars=2)
-    print(MultivariateBernoulliDistribution.kl_div(g1, g2))
+    dist3 = MultivariateBernoulliDistribution(n_vars=2, params=np.array([[(3/4 * 1/8), (3/4 * 7/8)],
+                                                                         [(1/4 * 7/8), (1/4 * 1/8)]]))
+    tc1 = dist3.total_correlation(dims=[0, 1])
+    tc2 = dist3.total_correlation(dims=[1, 0])
+    assert (tc1 == tc2)
+
+    mi1 = dist3.mutual_information(0, 1)
+    mi2 = dist3.mutual_information(1, 0)
+    assert (mi1 == mi2)
+
+    delta = 1/3
+    gamma = 1/7
+    p1 = 1/2 * 1/2 * (1-delta) * (1-gamma)
+    p2 = 1/2 * 1/2 * (1-delta) * (gamma)
+    p3 = 1/2 * 1/2 * (delta) * (gamma)
+    p4 = 1/2 * 1/2 * (delta) * (1-gamma)
+    dist4 = MultivariateBernoulliDistribution(n_vars=4, params=np.array(
+        [p1, p2, p3, p4, p4, p3, p2, p1, p4, p3, p2, p1, p1, p2, p3, p4]).reshape(2, 2, 2, 2))
+    assert (dist4.mutual_information(0, 1) == 0)
+    assert (dist4.mutual_information(0, 2) == 0)
+    assert (dist4.mutual_information(1, 2) == 0)
+    assert (dist4.mutual_information(0, 3) == 0)
+    assert (dist4.mutual_information(1, 3) == 0)
+    assert (
+        dist4.total_correlation(dims=[2, 3]) == dist4.mutual_information(2, 3))
+
+    print('All tests pass')
+
+    print(dist4.sample(10))
 
 
 if __name__ == '__main__':
