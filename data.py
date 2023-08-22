@@ -39,6 +39,19 @@ def generate_data_discrete(n_samples=1000, f1=parity, f2=parity, f3=parity):
     return D
 
 
+def generate_data_discrete_v2(n_samples=1000):
+    samples = []
+    for i in range(n_samples):
+        X1 = stats.bernoulli(0.5).rvs()
+        X2 = stats.bernoulli(0.5).rvs()
+        eps3 = stats.bernoulli(0.3).rvs()
+        X3 = (X1 ^ X2) ^ eps3
+        eps4 = stats.bernoulli(0.75).rvs()
+        X4 = X3 ^ eps4
+        samples.append([X1, X2, X3, X4])
+    return np.array(samples)
+
+
 def generate_data_continuous(*, n_samples=1000, n_dims=3):
     a = 10
     b = 2

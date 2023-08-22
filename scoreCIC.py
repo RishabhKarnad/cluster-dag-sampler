@@ -54,8 +54,10 @@ class ScoreCIC:
         m = len(C)
         log_m = np.log2(m)
 
-        return (stirling(self.dist.n_vars, len(C))
-                + np.sum([log_m*len(K_i) for K_i in C]))
+        return (np.log2(int(stirling(self.dist.n_vars, len(C))))
+                + np.sum([log_m*len(K_i) for K_i in C])
+                # + (np.sum([[X_i for X_i in list(K_i)] for K_i in C]))
+                )
 
     def __call__(self, G_C, *, penalize_complexity=True):
         penalty = self.penalty(G_C) if penalize_complexity else 0
@@ -84,9 +86,16 @@ def test():
     print(f'  Pairwise MI  : {score_CIC.pairwise_MI_all(G_C)}')
     print(f'  Penalty      : {score_CIC.penalty(G_C)}')
 
+    samples_4_vars = generate_data_discrete_v2()
+    # dist = MultivariateBernoulliDistribution(n_vars=4)
+    # dist.fit(samples_4_vars)
+    score = ScoreCIC(samples_4_vars, dist=MultivariateBernoulliDistribution)
+    G_C = ([{0, 1}, {2, 3}], np.array([[0, 1], [0, 0]]))
+    print(score(G_C))
+
 
 if __name__ == '__main__':
-    from data import generate_data_continuous, generate_data_discrete
+    from data import generate_data_continuous, generate_data_discrete, generate_data_discrete_v2
     from models.gaussian import GaussianDistribution
     from models.bernoulli import MultivariateBernoulliDistribution
 
