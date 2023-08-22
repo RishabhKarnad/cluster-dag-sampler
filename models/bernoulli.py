@@ -33,7 +33,7 @@ class MultivariateBernoulliDistribution:
                 f'Dimension of data {n} does not match number of variables {self.n_vars} of distribution')
 
         for i in range(m):
-            self.params[data[i, :]] += 1
+            self.params[tuple(data[i, :])] += 1
 
         self.params /= self.params.sum()
 
