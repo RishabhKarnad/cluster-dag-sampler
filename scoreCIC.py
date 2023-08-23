@@ -86,12 +86,30 @@ def test():
     print(f'  Pairwise MI  : {score_CIC.pairwise_MI_all(G_C)}')
     print(f'  Penalty      : {score_CIC.penalty(G_C)}')
 
-    samples_4_vars = generate_data_discrete_v2()
+    samples_4_vars = generate_data_discrete_v2(n_samples=10000)
     # dist = MultivariateBernoulliDistribution(n_vars=4)
     # dist.fit(samples_4_vars)
     score = ScoreCIC(samples_4_vars, dist=MultivariateBernoulliDistribution)
+
+    # score.dist.params = np.array([[[[0.04375, 0.13125],
+    #                                 [0.05625, 0.01875]],
+
+    #                                [[0.01875, 0.05625],
+    #                                 [0.13125, 0.04375]]],
+
+    #                               [[[0.01875, 0.05625],
+    #                                 [0.13125, 0.04375]],
+
+    #                                [[0.04375, 0.13125],
+    #                                 [0.05625, 0.01875]]]])
+
     G_C = ([{0, 1}, {2, 3}], np.array([[0, 1], [0, 0]]))
-    print(score(G_C))
+    s = score(G_C)
+    print(f'CIC            : {s}')
+    print(f'  TC           : {score.total_correlation_all(G_C)}')
+    print(f'  G2 score     : {score.g2(G_C)}')
+    print(f'  Pairwise MI  : {score.pairwise_MI_all(G_C)}')
+    print(f'  Penalty      : {score.penalty(G_C)}')
 
 
 if __name__ == '__main__':
