@@ -43,8 +43,15 @@ class UpperTriangular:
         n_graphs = int(2 ** k)
         return [self.get_graph(i) for i in range(n_graphs)]
 
+    def _check_k_parents(self, k, graph):
+        n_parents = graph.sum(axis=0)
+        return (n_parents <= k).all()
+
     def all_k_parent_graphs(self, k):
-        return []
+        all_graphs = self.all_graphs()
+        k_parent_graphs = list(
+            filter(lambda g: self._check_k_parents(k, g), all_graphs))
+        return k_parent_graphs
 
 
 def test():
@@ -53,7 +60,10 @@ def test():
     ut = UT.sample_n(10)
     print(ut)
     graphs = UT.all_graphs()
-    print(graphs)
+    # print(graphs)
+    print(len(graphs))
+    graphs = UT.all_k_parent_graphs(2)
+    # print(graphs)
     print(len(graphs))
 
 
