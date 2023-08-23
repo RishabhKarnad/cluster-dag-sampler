@@ -84,7 +84,7 @@ def find_cdag(data, *, score, steps=100, rho=0.5):
     score_G = score(G_star)
     scores = []
 
-    for _ in tqdm(range(steps)):
+    for i in tqdm(range(steps)):
         C = sample_clustering(n)
         G_C = sample_cdag(C, rho)
         G_prime = greedy_search(G_C, data, score)
@@ -93,6 +93,14 @@ def find_cdag(data, *, score, steps=100, rho=0.5):
             G_star = G_prime
             score_G = score_new
         scores.append(score_G)
+        print(f'[Iter {i}]')
+        print(f'    C: {G_prime[0]}')
+        print(f'    E: {G_prime[1]}')
+        print(f'    Score: {score_new}')
+        print(f'    Best: {score_G}')
+        accept = "Yes" if score_new > score_G else "No"
+        print(f'    Accept: {accept}')
+        print()
 
     return G_prime, scores
 
@@ -100,14 +108,14 @@ def find_cdag(data, *, score, steps=100, rho=0.5):
 def main():
     from scoreCIC import ScoreCIC
     from models.bernoulli import MultivariateBernoulliDistribution
-    from data import generate_data_discrete
+    from data import generate_data_discrete, generate_data_discrete_v2
     import matplotlib.pyplot as plt
 
-    data = generate_data_discrete(n_samples=1000)
+    data = generate_data_discrete_v2(n_samples=1000)
     score_CIC = ScoreCIC(
         data=data, dist=MultivariateBernoulliDistribution)
 
-    G_C, scores = find_cdag(data, score=score_CIC, steps=10000)
+    G_C, scores = find_cdag(data, score=score_CIC, steps=1000)
     print(G_C)
     plt.plot(scores)
     plt.savefig('./scores.png')
