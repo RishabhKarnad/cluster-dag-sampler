@@ -11,12 +11,20 @@ from scoreCIC import ScoreCIC
 from models.upper_triangular import UpperTriangular
 
 
+MAX_PARENTS = 2
+
+N_WARMUP = 10
+N_SAMPLES = 50
+
+
 class CDAGSampler:
     def __init__(self, *, data, dist, penalize_complexity=True):
         m, n = data.shape
 
         self.n_nodes = n
-        self.samples = [self.make_random_partitioning()]
+        K_init = self.make_random_partitioning()
+        G_init = UpperTriangular(len(K_init)).sample()
+        self.samples = [(K_init, G_init)]
         self.U = stats.uniform(0, 1)
 
         self.data = data
@@ -24,8 +32,12 @@ class CDAGSampler:
         self.penalize_complexity = penalize_complexity
         self.scores = []
 
+        self.ctx = {}
+
     def _reset(self):
-        self.samples = [self.make_random_partitioning()]
+        K_init = self.make_random_partitioning()
+        G_init = UpperTriangular(len(K_init)).sample()
+        self.samples = [(K_init, G_init)]
         self.scores = []
 
     def make_random_partitioning(self):
@@ -37,13 +49,22 @@ class CDAGSampler:
 
     def sample(self, n_samples=5000, n_warmup=1000):
         for i in tqdm(range(n_warmup)):
-            K_t = self.step()
-            self.samples.append(K_t)
+            K_t, G_t = self.step()
+            self.samples.append((K_t, G_t))
 
         for i in tqdm(range(n_samples)):
-            K_t = self.step()
-            self.samples.append(K_t)
-            self.scores.append(self.cluster_score(K_t))
+            K_t, G_t = self.step()
+            self.samples.append((K_t, G_t))
+            self.scores.append(
+                (self.cluster_score(K_t), self.score((K_t, G_t))))
+
+    def make_graph_dist(self, scores):
+        support = len(scores)
+        params = np.array(scores)
+        params -= min(params.min(), 0)
+        params /= params.sum()
+        return stats.rv_discrete(
+            name='categorical', a=0, b=(support), inc=1, values=(np.arange(support), params))
 
     def step(self):
         alpha = self.U.rvs()
@@ -55,12 +76,18 @@ class CDAGSampler:
             u = self.U.rvs()
             a = self.prob_accept(K_star)
             if u < a:
-                return K_star
+                graph_index = self.make_graph_dist(
+                    self.ctx['graph_scores']).rvs()
+                graph = self.ctx['graphs'][graph_index]
+                return K_star, graph
             else:
-                return self.samples[-1]
+                graph_index = self.make_graph_dist(
+                    self.ctx['prev_graph_scores']).rvs()
+                graph = self.ctx['prev_graphs'][graph_index]
+                return self.samples[-1][0], graph
 
     def sample_K(self):
-        K_prev = self.samples[-1]
+        K_prev, _ = self.samples[-1]
         K = deepcopy(K_prev)
 
         n_neighbours = self.count_neighbours(K_prev)
@@ -119,13 +146,19 @@ class CDAGSampler:
         return n_merges + n_splits
 
     def prob_accept(self, K_star):
-        K_prev = self.samples[-1]
+        K_prev, _ = self.samples[-1]
 
         nbd_K_star = self.count_neighbours(K_star)
         nbd_K_prev = self.count_neighbours(K_prev)
 
-        prob_K_star = self.cluster_score(K_star)
-        prob_K_prev = self.cluster_score(K_prev)
+        prob_K_star, graphs, graph_scores = self.cluster_score(K_star)
+        prob_K_prev, prev_graphs, prev_graph_scores = self.cluster_score(
+            K_prev)
+
+        self.ctx['graphs'] = graphs
+        self.ctx['prev_graphs'] = prev_graphs
+        self.ctx['graph_scores'] = graph_scores
+        self.ctx['prev_graph_scores'] = prev_graph_scores
 
         rho = (nbd_K_prev * prob_K_star) / (nbd_K_star * prob_K_prev)
 
@@ -133,15 +166,21 @@ class CDAGSampler:
 
     def cluster_score(self, K):
         score = 0
+        graphs = []
+        graph_scores = []
         for E in self.sample_graphs(K):
             V = [sorted(K_i) for K_i in K]
             G_C = (V, E)
-            score += self.graph_score(G_C)
-        return score
+            graph_score = self.graph_score(G_C)
+            score += graph_score
+            graphs.append(E)
+            graph_scores.append(graph_score)
+        return score, graphs, graph_scores
 
     def sample_graphs(self, K, *, n_samples=None):
         if n_samples is None:
-            return UpperTriangular(len(K)).all_graphs()
+            # return UpperTriangular(len(K)).all_graphs()
+            return UpperTriangular(len(K)).all_k_parent_graphs(k=MAX_PARENTS)
         return UpperTriangular(len(K)).sample_n(n_samples)
 
     def graph_score(self, G_C):
@@ -149,20 +188,28 @@ class CDAGSampler:
 
 
 def test():
-    data = generate_data_continuous(n_samples=100, n_dims=5)
-    dist = GaussianDistribution
+    # data = generate_data_continuous(n_samples=100, n_dims=5)
+    # dist = GaussianDistribution
 
     # data = generate_data_discrete(n_samples=100)
-    # dist = MultivariateBernoulliDistribution
+    data = generate_data_discrete_v2()
+    dist = MultivariateBernoulliDistribution
 
     sampler = CDAGSampler(data=data, dist=dist)
-    sampler.sample()
-    print(sampler.samples[-1])
+    sampler.sample(n_warmup=N_WARMUP, n_samples=N_SAMPLES)
+    for i, sample in enumerate(sampler.samples[N_WARMUP:-1]):
+        print(f'[Sample {i}]')
+        C, G = sample
+        score_C, score_CIC = sampler.scores[i]
+        print(f'    C: {C}')
+        print(f'    G: {G}')
+        print(f'    cluster score: {score_C}')
+        print(f'    graph_score: {score_CIC}')
 
 
 if __name__ == '__main__':
-    from data import generate_data_continuous, generate_data_discrete
+    from data import generate_data_continuous, generate_data_discrete, generate_data_discrete_v2
     from models.gaussian import GaussianDistribution
-    # from models.bernoulli import MultivariateBernoulliDistribution
+    from models.bernoulli import MultivariateBernoulliDistribution
 
     test()
