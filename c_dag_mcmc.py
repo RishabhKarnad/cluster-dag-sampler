@@ -13,8 +13,8 @@ from models.upper_triangular import UpperTriangular
 
 MAX_PARENTS = 2
 
-N_WARMUP = 10
-N_SAMPLES = 50
+N_WARMUP = 100
+N_SAMPLES = 500
 
 
 class CDAGSampler:
@@ -191,8 +191,8 @@ def test():
     # data = generate_data_continuous(n_samples=100, n_dims=5)
     # dist = GaussianDistribution
 
-    # data = generate_data_discrete(n_samples=100)
-    data = generate_data_discrete_v2()
+    data = generate_data_discrete(n_samples=100)
+    # data = generate_data_discrete_v2()
     dist = MultivariateBernoulliDistribution
 
     sampler = CDAGSampler(data=data, dist=dist)
@@ -205,11 +205,25 @@ def test():
         print(f'    G: {G}')
         print(f'    cluster score: {score_C}')
         print(f'    graph_score: {score_CIC}')
+    print('=========================')
+
+    # g_true = np.array([[0, 0, 1, 0], [0, 0, 1, 0], [0, 0, 0, 1], [0, 0, 0, 0]])
+    g_true = np.array([[0, 0, 0, 0, 0, 0, 1, 0],
+                       [0, 0, 0, 0, 0, 0, 1, 0],
+                       [0, 0, 0, 0, 0, 0, 1, 0],
+                       [0, 0, 0, 0, 0, 0, 1, 1],
+                       [0, 0, 0, 0, 0, 0, 1, 1],
+                       [0, 0, 0, 0, 0, 0, 1, 1],
+                       [0, 0, 0, 0, 0, 0, 0, 1],
+                       [0, 0, 0, 0, 0, 0, 0, 0]])
+    ecshd = expected_cluster_shd(g_true, sampler.samples[-20:-1])
+    print(f'E-CSHD: {ecshd}')
 
 
 if __name__ == '__main__':
     from data import generate_data_continuous, generate_data_discrete, generate_data_discrete_v2
     from models.gaussian import GaussianDistribution
     from models.bernoulli import MultivariateBernoulliDistribution
+    from metrics import expected_cluster_shd
 
     test()

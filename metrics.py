@@ -1,7 +1,7 @@
 import numpy as np
 
 from cdt.metrics import SHD
-
+import networkx as nx
 
 # def shd_agn(B_true, B_est):
 #     pred = np.flatnonzero(B_est == 1)
@@ -25,6 +25,38 @@ from cdt.metrics import SHD
 #     return shd
 
 
+def is_dsep(graph, x, y, z):
+    # Check if x and y are d-separated given z in the graph
+    return not any([path for path in nx.all_simple_paths(graph, source=x, target=y) if is_blocked(graph, path, z)])
+
+
+def is_blocked(graph, path, z):
+    # Check if the path is blocked by a set of nodes z in the graph
+    for i in range(len(path) - 2):
+        if (path[i + 1], path[i + 2]) not in graph.edges() and path[i + 1] not in z:
+            return True
+        if path[i + 1] in z:
+            return True
+    return False
+
+
+def essential_graph(adjacency_matrix):
+    graph = nx.DiGraph(adjacency_matrix)
+    essential_graph = graph.copy()
+
+    nodes = list(graph.nodes())
+    for i in range(len(nodes)):
+        for j in range(i+1, len(nodes)):
+            if graph.has_edge(nodes[i], nodes[j]):
+                essential_graph.remove_edge(nodes[i], nodes[j])
+                if not is_dsep(graph, nodes[i], nodes[j], essential_graph.predecessors(nodes[i])):
+                    essential_graph.add_edge(nodes[i], nodes[j])
+                else:
+                    essential_graph.add_edge(nodes[j], nodes[i])
+
+    return essential_graph
+
+
 def cluster_shd(g_true, g_c):
     def get_cdag(clusters, adj):
         edges = np.zeros((len(clusters), len(clusters)))
@@ -40,7 +72,11 @@ def cluster_shd(g_true, g_c):
 
     g_c_true = get_cdag(clusters=g_c[0], adj=g_true)
 
-    return SHD(g_c_true[1], g_c[1])
+    return SHD(essential_graph(g_c_true[1]), essential_graph(g_c[1]))
+
+
+def expected_cluster_shd(g_true, graphs):
+    return np.sum([cluster_shd(g_true, g_c) for g_c in graphs]) / len(graphs)
 
 
 def test():
