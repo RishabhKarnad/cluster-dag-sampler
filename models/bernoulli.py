@@ -3,6 +3,9 @@ import scipy.stats as stats
 from scipy.special import rel_entr
 
 
+EPS = 1e-10
+
+
 class MultivariateBernoulliDistribution:
     def __init__(self, n_vars=1, params=None):
         self.n_vars = n_vars
@@ -34,6 +37,8 @@ class MultivariateBernoulliDistribution:
 
         for i in range(m):
             self.params[tuple(data[i, :])] += 1
+
+        self.params += EPS
 
         self.params /= self.params.sum()
 
@@ -122,6 +127,9 @@ class MultivariateBernoulliDistribution:
         if p_pdf.size != q_pdf.size:
             raise RuntimeError(
                 f'Size of support of distributions do not match: {p_pdf.size} and {q_pdf.size}')
+
+        if (q_pdf == 0).any():
+            raise RuntimeError('Divide by zero')
 
         return np.sum(p_pdf * np.log2(p_pdf / q_pdf))
 
