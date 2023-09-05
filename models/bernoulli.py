@@ -6,6 +6,16 @@ from scipy.special import rel_entr
 EPS = 1e-10
 
 
+def make_permutation_matrix(seq):
+    n = len(seq)
+    P = np.zeros((n, n), dtype=int)
+    target = sorted(list(zip(range(len(seq)), seq)), key=lambda x: x[1])
+    for i, x in enumerate(target):
+        j = x[0]
+        P[i, j] = 1
+    return P
+
+
 class MultivariateBernoulliDistribution:
     def __init__(self, n_vars=1, params=None):
         self.n_vars = n_vars
@@ -100,7 +110,11 @@ class MultivariateBernoulliDistribution:
         dist_marginal = self.marginal(dims=(dims_combined))
         marginal_i, marginal_j = (
             self.marginal(dims=K_i).pk, self.marginal(dims=K_j).pk)
-        params = np.multiply.outer(marginal_i, marginal_j)
+        P = make_permutation_matrix(dims_combined)
+        permute_order = np.arange(len(dims_combined), dtype=int) @ P.T
+        params = (np.multiply.outer(marginal_i, marginal_j)
+                  .reshape(np.ones(len(dims_combined), dtype=int)*2)
+                  .transpose(tuple(permute_order)))
         dist_indep = self.make_dist(params.squeeze())
         return MultivariateBernoulliDistribution.kl_div(dist_marginal, dist_indep)
 
