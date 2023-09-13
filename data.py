@@ -1,5 +1,15 @@
 import numpy as np
 import scipy.stats as stats
+import networkx as nx
+import igraph as ig
+# import jax
+import jax.numpy as jnp
+# from jax import random
+import matplotlib.pyplot as plt
+from pgmpy.models import LinearGaussianBayesianNetwork
+
+
+# jax.default_device = jax.devices('cpu')[0]
 
 
 def fit_bernoulli(x):
@@ -94,3 +104,57 @@ def generate_data_continuous_v2(*, n_samples=1000, n_dims=3):
         samples.append(np.hstack([[x1, x3], xs, [x2]]))
 
     return np.array(samples)
+
+
+def generate_data_continuous_v3(n_samples=100):
+    adjacency_matrix = np.zeros((5, 5))
+    adjacency_matrix[0, 1] = 1
+    adjacency_matrix[0, 2] = 1
+    adjacency_matrix[1, 2] = 1
+    adjacency_matrix[1, 3] = 1
+    adjacency_matrix[3, 4] = 1
+
+    G = nx.from_numpy_array(adjacency_matrix, create_using=nx.MultiDiGraph())
+    G_LBN = nx.from_numpy_array(
+        adjacency_matrix, create_using=LinearGaussianBayesianNetwork)
+    g = ig.Graph.from_networkx(G)
+    g.vs['label'] = g.vs['_nx_name']
+
+    obs_noise = 0.1
+    N = n_samples  # no. of samples
+    nvars = len(g.vs)
+    nclus = 3
+    # key = random.PRNGKey(135)  # (123)
+    # key_, subkey = random.split(key)
+
+    theta = np.random.normal(size=(nvars, nvars)) * \
+        100  # jnp.zeros((nvars,nvars)) #
+    theta[0, 1] = 1
+    theta[0, 2] = 1
+    theta[0, 3] = 0
+    theta[2, 3] = 0
+    # theta=theta[1,2].set(-5)
+    theta[1, 2] = -1
+    theta[1, 3] = 2
+    theta[3, 4] = 3
+
+    # key_, subkey = random.split(key_)
+    noise = np.sqrt(obs_noise)*np.random.normal(size=(N, nvars))
+
+    toporder = g.topological_sorting()
+    print(toporder)
+
+    X = np.zeros((N, nvars))
+
+    for j in toporder:
+        parent_edges = g.incident(j, mode='in')
+        parents = list(g.es[e].source for e in parent_edges)
+
+        if parents:
+            mean = X[:, np.array(parents)] @ theta[np.array(parents), j]
+            X[:, j] = mean + noise[:, j]
+
+        else:
+            X[:, j] = noise[:, j]
+
+    return X

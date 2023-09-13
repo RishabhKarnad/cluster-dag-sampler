@@ -1,19 +1,9 @@
 import numpy as np
 import scipy.stats as stats
 from scipy.special import rel_entr
-
+from utils.permutation import make_permutation_matrix
 
 EPS = 1e-10
-
-
-def make_permutation_matrix(seq):
-    n = len(seq)
-    P = np.zeros((n, n), dtype=int)
-    target = sorted(list(zip(range(len(seq)), seq)), key=lambda x: x[1])
-    for i, x in enumerate(target):
-        j = x[0]
-        P[i, j] = 1
-    return P
 
 
 class MultivariateBernoulliDistribution:
