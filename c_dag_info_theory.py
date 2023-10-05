@@ -37,7 +37,7 @@ def get_neighbours(G_C):
     k = len(C)
     G = E_C
 
-    neighbours = []
+    neighbours = [G_C]
 
     # Add neighbours with one edge removed
     for i in range(k):
@@ -107,13 +107,18 @@ def find_cdag(data, *, score, steps=100, rho=0.5):
 
 def main():
     from scoreCIC import ScoreCIC
-    from models.bernoulli import MultivariateBernoulliDistribution
-    from data import generate_data_discrete, generate_data_discrete_v2
+    # from models.bernoulli import MultivariateBernoulliDistribution
+    from models.gaussian import GaussianDistribution
+    from data import generate_data_discrete, generate_data_discrete_v2, generate_data_continuous_v3
     import matplotlib.pyplot as plt
 
-    data = generate_data_discrete_v2(n_samples=1000)
+    # data = generate_data_discrete_v2(n_samples=1000)
+    # score_CIC = ScoreCIC(
+    #     data=data, dist=MultivariateBernoulliDistribution)
+
+    data = generate_data_continuous_v3(n_samples=1000)
     score_CIC = ScoreCIC(
-        data=data, dist=MultivariateBernoulliDistribution)
+        data=data, dist=GaussianDistribution)
 
     G_C, scores = find_cdag(data, score=score_CIC, steps=1000)
     print(G_C)
