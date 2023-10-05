@@ -1,0 +1,8 @@
+#! /bin/bash
+
+DIR=$(date +"%Y-%m-%d-%T")
+mkdir -p results/$DIR
+
+python experiment-4-var.py > results/$DIR/out_mcmc.txt
+python experiment-8-var.py > results/$DIR/out_mcmc_large.txt
+python experiment-gaussian.py > results/$DIR/out_mcmc_gaussian.txt
