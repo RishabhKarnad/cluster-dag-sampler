@@ -108,27 +108,21 @@ class CDAGSampler:
 
     def find_i_star(self, K, j):
         # TODO: optimize
-        i_star = 0
         for i_lim in range(len(K)):
             neighbours_lim = self.count_neighbours(K, upto=i_lim)
-            if neighbours_lim > j:
-                return i_star
-            else:
-                i_star = i_lim
+            if j <= neighbours_lim:
+                return i_lim
 
     def find_c_star(self, K, j, i_star):
-        c_star = 0
         k_i_star = len(K[i_star])
 
-        n_neighbours_i_star = self.count_neighbours(K, upto=i_star)
+        n_neighbours_i_star = self.count_neighbours(K, upto=i_star-1)
 
-        for c_lim in range(len(K[i_star])):
+        for c_lim in range(1, len(K[i_star])+1):
             n_splits_c_lim = np.sum([comb(k_i_star, c)
                                     for c in range(1, c_lim)])
-            if n_neighbours_i_star + n_splits_c_lim > j:
-                return c_star + 1  # index + 1 -> count
-            else:
-                c_star = c_lim
+            if j <= n_neighbours_i_star + n_splits_c_lim:
+                return c_lim
 
     def count_neighbours(self, K, upto=None):
         m = len(K)
@@ -137,7 +131,7 @@ class CDAGSampler:
 
         n_splits = 0
 
-        lim = m or upto
+        lim = m or (upto + 1)
         for i in range(lim):
             k_i = len(K[i])
             for c in range(1, k_i):
@@ -191,11 +185,13 @@ def test():
     # data = generate_data_continuous(n_samples=100, n_dims=5)
     # dist = GaussianDistribution
 
-    data = generate_data_discrete(n_samples=100)
+    # data = generate_data_discrete(n_samples=100)
+    data = generate_data_discrete_v2(n_samples=100)
     # data = generate_data_discrete_v2()
     dist = MultivariateBernoulliDistribution
 
     sampler = CDAGSampler(data=data, dist=dist)
+    sampler.count_neighbours([{1}, {2, 3}, {4, 5}])
     sampler.sample(n_warmup=N_WARMUP, n_samples=N_SAMPLES)
     for i, sample in enumerate(sampler.samples[N_WARMUP:-1]):
         print(f'[Sample {i}]')
@@ -207,15 +203,15 @@ def test():
         print(f'    graph_score: {score_CIC}')
     print('=========================')
 
-    # g_true = np.array([[0, 0, 1, 0], [0, 0, 1, 0], [0, 0, 0, 1], [0, 0, 0, 0]])
-    g_true = np.array([[0, 0, 0, 0, 0, 0, 1, 0],
-                       [0, 0, 0, 0, 0, 0, 1, 0],
-                       [0, 0, 0, 0, 0, 0, 1, 0],
-                       [0, 0, 0, 0, 0, 0, 1, 1],
-                       [0, 0, 0, 0, 0, 0, 1, 1],
-                       [0, 0, 0, 0, 0, 0, 1, 1],
-                       [0, 0, 0, 0, 0, 0, 0, 1],
-                       [0, 0, 0, 0, 0, 0, 0, 0]])
+    g_true = np.array([[0, 0, 1, 0], [0, 0, 1, 0], [0, 0, 0, 1], [0, 0, 0, 0]])
+    # g_true = np.array([[0, 0, 0, 0, 0, 0, 1, 0],
+    #                    [0, 0, 0, 0, 0, 0, 1, 0],
+    #                    [0, 0, 0, 0, 0, 0, 1, 0],
+    #                    [0, 0, 0, 0, 0, 0, 1, 1],
+    #                    [0, 0, 0, 0, 0, 0, 1, 1],
+    #                    [0, 0, 0, 0, 0, 0, 1, 1],
+    #                    [0, 0, 0, 0, 0, 0, 0, 1],
+    #                    [0, 0, 0, 0, 0, 0, 0, 0]])
     ecshd = expected_cluster_shd(g_true, sampler.samples[-20:-1])
     print(f'E-CSHD: {ecshd}')
 
