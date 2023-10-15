@@ -55,5 +55,7 @@ for graph in sampler.samples:
     if graph_string not in graph_counts:
         graph_counts[graph_string] = 0
     graph_counts[graph_string] += 1
-graph_counts = sorted(graph_counts, key=graph_counts.get, reverse=True)
-print(graph_counts[:5])
+graphs = sorted(graph_counts, key=graph_counts.get, reverse=True)
+graph_counts = [graph_counts[g] for g in graphs]
+graph_info = list(zip(graphs, graph_counts))
+print(graph_info[:5])

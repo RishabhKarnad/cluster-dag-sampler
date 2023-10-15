@@ -106,7 +106,7 @@ def generate_data_continuous_v2(*, n_samples=1000, n_dims=3):
     return np.array(samples)
 
 
-def generate_data_continuous_v3(n_samples=100):
+def generate_data_continuous_v3(n_samples=100, return_scm=False):
     adjacency_matrix = np.zeros((5, 5))
     adjacency_matrix[0, 1] = 1
     adjacency_matrix[0, 2] = 1
@@ -115,8 +115,6 @@ def generate_data_continuous_v3(n_samples=100):
     adjacency_matrix[3, 4] = 1
 
     G = nx.from_numpy_array(adjacency_matrix, create_using=nx.MultiDiGraph())
-    G_LBN = nx.from_numpy_array(
-        adjacency_matrix, create_using=LinearGaussianBayesianNetwork)
     g = ig.Graph.from_networkx(G)
     g.vs['label'] = g.vs['_nx_name']
 
@@ -156,5 +154,8 @@ def generate_data_continuous_v3(n_samples=100):
 
         else:
             X[:, j] = noise[:, j]
+
+    if return_scm:
+        return X, (adjacency_matrix, theta)
 
     return X
