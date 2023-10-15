@@ -2,14 +2,6 @@ import numpy as np
 import scipy.stats as stats
 import networkx as nx
 import igraph as ig
-# import jax
-import jax.numpy as jnp
-# from jax import random
-import matplotlib.pyplot as plt
-from pgmpy.models import LinearGaussianBayesianNetwork
-
-
-# jax.default_device = jax.devices('cpu')[0]
 
 
 def fit_bernoulli(x):
@@ -41,15 +33,9 @@ def logical_and_elemwise(x, y):
     return np.vectorize(logical_and)(x, y)
 
 
-def generate_data_discrete(n_samples=1000, f1=parity, f2=parity, f3=parity):
-    X = stats.bernoulli(0.5).rvs((n_samples, 6))
-    X_7 = logical_and_elemwise(f1(X[:, 0:3]), f2(X[:, 3:6]))
-    X_8 = logical_and_elemwise(X_7, f3(X[:, 3:6]))
-    D = np.hstack([X, X_7, X_8])
-    return D
+def generate_data_discrete_4(n_samples=1000):
+    g_true = np.array([[0, 0, 1, 0], [0, 0, 1, 0], [0, 0, 0, 1], [0, 0, 0, 0]])
 
-
-def generate_data_discrete_v2(n_samples=1000):
     samples = []
     for i in range(n_samples):
         X1 = stats.bernoulli(0.5).rvs()
@@ -59,10 +45,34 @@ def generate_data_discrete_v2(n_samples=1000):
         eps4 = stats.bernoulli(0.75).rvs()
         X4 = X3 ^ eps4
         samples.append([X1, X2, X3, X4])
-    return np.array(samples)
+    return np.array(samples), (g_true,)
+
+
+def generate_data_discrete_8(n_samples=1000, f1=parity, f2=parity, f3=parity):
+    g_true = np.array([[0, 0, 0, 0, 0, 0, 1, 0],
+                       [0, 0, 0, 0, 0, 0, 1, 0],
+                       [0, 0, 0, 0, 0, 0, 1, 0],
+                       [0, 0, 0, 0, 0, 0, 1, 1],
+                       [0, 0, 0, 0, 0, 0, 1, 1],
+                       [0, 0, 0, 0, 0, 0, 1, 1],
+                       [0, 0, 0, 0, 0, 0, 0, 1],
+                       [0, 0, 0, 0, 0, 0, 0, 0]])
+
+    X = stats.bernoulli(0.5).rvs((n_samples, 6))
+    X_7 = logical_and_elemwise(f1(X[:, 0:3]), f2(X[:, 3:6]))
+    X_8 = logical_and_elemwise(X_7, f3(X[:, 3:6]))
+    D = np.hstack([X, X_7, X_8])
+    return D, (g_true,)
 
 
 def generate_data_continuous(*, n_samples=1000, n_dims=3):
+    g_true = np.array([[0, 1, 1], [0, 0, 1], [0, 0, 0]])
+    n_dims_rest = n_dims - 3
+    if n_dims_rest > 0:
+        g_true = np.hstack([g_true, np.zeros((3, n_dims_rest), dtype=int)])
+        g_true = np.vstack(
+            [g_true, np.zeros((n_dims_rest, n_dims), dtype=int)])
+
     a = 10
     b = 2
     c = -20
@@ -81,32 +91,10 @@ def generate_data_continuous(*, n_samples=1000, n_dims=3):
 
         samples.append(np.hstack([[x1, x2, x3], xs]))
 
-    return np.array(samples)
+    return np.array(samples), (g_true,)
 
 
-def generate_data_continuous_v2(*, n_samples=1000, n_dims=3):
-    a = 10
-    b = 2
-    c = -20
-
-    samples = []
-
-    for i in range(n_samples):
-        n1 = stats.norm(0, 1).rvs()
-        n2 = stats.norm(0, 1).rvs()
-        n3 = stats.norm(0, 1).rvs()
-
-        x1 = n1
-        x2 = a*x1 + n2
-        x3 = b*x2 + c*x1 + n3
-        xs = stats.norm(0, 1).rvs(n_dims - 3)
-
-        samples.append(np.hstack([[x1, x3], xs, [x2]]))
-
-    return np.array(samples)
-
-
-def generate_data_continuous_v3(n_samples=100, return_scm=False):
+def generate_data_continuous_5(n_samples=100):
     adjacency_matrix = np.zeros((5, 5))
     adjacency_matrix[0, 1] = 1
     adjacency_matrix[0, 2] = 1
@@ -119,24 +107,18 @@ def generate_data_continuous_v3(n_samples=100, return_scm=False):
     g.vs['label'] = g.vs['_nx_name']
 
     obs_noise = 0.1
-    N = n_samples  # no. of samples
+    N = n_samples
     nvars = len(g.vs)
-    nclus = 3
-    # key = random.PRNGKey(135)  # (123)
-    # key_, subkey = random.split(key)
 
-    theta = np.random.normal(size=(nvars, nvars)) * \
-        100  # jnp.zeros((nvars,nvars)) #
+    theta = np.random.normal(size=(nvars, nvars)) * 100
     theta[0, 1] = 1
     theta[0, 2] = 1
     theta[0, 3] = 0
     theta[2, 3] = 0
-    # theta=theta[1,2].set(-5)
     theta[1, 2] = -1
     theta[1, 3] = 2
     theta[3, 4] = 3
 
-    # key_, subkey = random.split(key_)
     noise = np.sqrt(obs_noise)*np.random.normal(size=(N, nvars))
 
     toporder = g.topological_sorting()
@@ -155,7 +137,4 @@ def generate_data_continuous_v3(n_samples=100, return_scm=False):
         else:
             X[:, j] = noise[:, j]
 
-    if return_scm:
-        return X, (adjacency_matrix, theta)
-
-    return X
+    return X, (adjacency_matrix, theta)

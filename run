@@ -3,6 +3,27 @@
 DIR=$(date +"%Y-%m-%d-%T")
 mkdir -p results/$DIR
 
-python experiment-4-var.py > results/$DIR/out_mcmc.txt
-python experiment-8-var.py > results/$DIR/out_mcmc_large.txt
-python experiment-gaussian.py > results/$DIR/out_mcmc_gaussian.txt
+N_DATA_SAMPLES=100
+N_MCMC_SAMPLES=100
+N_MCMC_WARMUP=50
+
+python run_experiment.py \
+    --data discrete_4 \
+    --n_data_samples $N_DATA_SAMPLES \
+    --n_mcmc_samples $N_MCMC_SAMPLES \
+    --n_mcmc_warmup $N_MCMC_WARMUP \
+    > results/$DIR/out_mcmc.txt
+
+python run_experiment.py \
+    --data discrete_8 \
+    --n_data_samples $N_DATA_SAMPLES \
+    --n_mcmc_samples $N_MCMC_SAMPLES \
+    --n_mcmc_warmup $N_MCMC_WARMUP \
+    > results/$DIR/out_mcmc_large.txt
+
+python run_experiment.py \
+    --data continuous_5 \
+    --n_data_samples $N_DATA_SAMPLES \
+    --n_mcmc_samples $N_MCMC_SAMPLES \
+    --n_mcmc_warmup $N_MCMC_WARMUP \
+    > results/$DIR/out_mcmc_gaussian.txt

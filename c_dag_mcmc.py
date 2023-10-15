@@ -182,12 +182,7 @@ class CDAGSampler:
 
 
 def test():
-    # data = generate_data_continuous(n_samples=100, n_dims=5)
-    # dist = GaussianDistribution
-
-    # data = generate_data_discrete(n_samples=100)
-    data = generate_data_discrete_v2(n_samples=100)
-    # data = generate_data_discrete_v2()
+    data, _ = generate_data_discrete_4(n_samples=100)
     dist = MultivariateBernoulliDistribution
 
     sampler = CDAGSampler(data=data, dist=dist)
@@ -204,21 +199,12 @@ def test():
     print('=========================')
 
     g_true = np.array([[0, 0, 1, 0], [0, 0, 1, 0], [0, 0, 0, 1], [0, 0, 0, 0]])
-    # g_true = np.array([[0, 0, 0, 0, 0, 0, 1, 0],
-    #                    [0, 0, 0, 0, 0, 0, 1, 0],
-    #                    [0, 0, 0, 0, 0, 0, 1, 0],
-    #                    [0, 0, 0, 0, 0, 0, 1, 1],
-    #                    [0, 0, 0, 0, 0, 0, 1, 1],
-    #                    [0, 0, 0, 0, 0, 0, 1, 1],
-    #                    [0, 0, 0, 0, 0, 0, 0, 1],
-    #                    [0, 0, 0, 0, 0, 0, 0, 0]])
     ecshd = expected_cluster_shd(g_true, sampler.samples[-20:-1])
     print(f'E-CSHD: {ecshd}')
 
 
 if __name__ == '__main__':
-    from data import generate_data_continuous, generate_data_discrete, generate_data_discrete_v2
-    from models.gaussian import GaussianDistribution
+    from data import generate_data_discrete_4
     from models.bernoulli import MultivariateBernoulliDistribution
     from metrics import expected_cluster_shd
 

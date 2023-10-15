@@ -109,14 +109,14 @@ def main():
     from scoreCIC import ScoreCIC
     # from models.bernoulli import MultivariateBernoulliDistribution
     from models.gaussian import GaussianDistribution
-    from data import generate_data_discrete, generate_data_discrete_v2, generate_data_continuous_v3
+    from data import generate_data_discrete_8, generate_data_discrete_4, generate_data_continuous_5
     import matplotlib.pyplot as plt
 
     # data = generate_data_discrete_v2(n_samples=1000)
     # score_CIC = ScoreCIC(
     #     data=data, dist=MultivariateBernoulliDistribution)
 
-    data = generate_data_continuous_v3(n_samples=1000)
+    data, (g_true, theta_true) = generate_data_continuous_5(n_samples=1000)
     score_CIC = ScoreCIC(
         data=data, dist=GaussianDistribution)
 

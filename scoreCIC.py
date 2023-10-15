@@ -73,7 +73,7 @@ def test():
                   [0, 0, 0]])
     G_C = (K, G)
 
-    data = generate_data_continuous(n_samples=100, n_dims=5)
+    data, _ = generate_data_continuous(n_samples=100, n_dims=5)
     score_CIC = ScoreCIC(data=data, dist=GaussianDistribution)
 
     # data = generate_data_discrete(n_samples=100)
@@ -86,7 +86,7 @@ def test():
     print(f'  Pairwise MI  : {score_CIC.pairwise_MI_all(G_C)}')
     print(f'  Penalty      : {score_CIC.penalty(G_C)}')
 
-    samples_4_vars = generate_data_discrete_v2(n_samples=10000)
+    samples_4_vars, _ = generate_data_discrete_4(n_samples=10000)
     # dist = MultivariateBernoulliDistribution(n_vars=4)
     # dist.fit(samples_4_vars)
     score = ScoreCIC(samples_4_vars, dist=MultivariateBernoulliDistribution)
@@ -113,7 +113,7 @@ def test():
 
 
 if __name__ == '__main__':
-    from data import generate_data_continuous, generate_data_discrete, generate_data_discrete_v2
+    from data import generate_data_continuous, generate_data_discrete_8, generate_data_discrete_4
     from models.gaussian import GaussianDistribution
     from models.bernoulli import MultivariateBernoulliDistribution
 
