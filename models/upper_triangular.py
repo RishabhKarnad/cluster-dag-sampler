@@ -1,4 +1,5 @@
 import numpy as np
+from itertools import combinations
 
 
 class UpperTriangular:
@@ -47,11 +48,39 @@ class UpperTriangular:
         n_parents = graph.sum(axis=0)
         return (n_parents <= k).all()
 
+    # def generate_columns(self, i, max_parents):
+    #     n = 10
+
+    #     all_columns = []
+
+    #     max_parents = min(i, max_parents)
+
+    #     for k in range(max_parents+1):
+    #         # In the kth iteration, generate all ith columns with exactly k 1's
+
+    #         all_columns_k_ones = np.array([
+    #             # in the ith column, there can be at most i 1's
+    #             [1 if j in comb else 0 for j in range(i)]
+    #             for comb in combinations(np.arange(i), k)
+    #         ])
+    #         all_columns.append(all_columns_k_ones)
+
+    #     all_columns = np.vstack(all_columns)
+    #     all_columns = np.hstack([all_columns, np.zeros(
+    #         (all_columns.shape[0], n-all_columns.shape[1]))])
+    #     return list(all_columns)
+
     def all_k_parent_graphs(self, k):
         all_graphs = self.all_graphs()
         k_parent_graphs = list(
             filter(lambda g: self._check_k_parents(k, g), all_graphs))
         return k_parent_graphs
+
+        # n = self.n
+
+        # # ith element is an array containing all possible ith columns
+        # # of upper triangular adjacency matrix with upto k 1's
+        # columns = [self.generate_columns(i, k) for i in range(n)]
 
 
 def test():
