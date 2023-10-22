@@ -15,6 +15,27 @@
                 ">",
                 "debug-out.txt"
             ]
+        },
+        {
+            "name": "Run experiments",
+            "type": "python",
+            "request": "launch",
+            "program": "${file}",
+            "console": "integratedTerminal",
+            "justMyCode": true,
+            "args": [
+                "--data",
+                "continuous_5",
+                "--n_data_samples",
+                "100",
+                "--n_mcmc_samples",
+                "10",
+                "--n_mcmc_warmup",
+                "5",
+                "--estimate_parameters",
+                ">",
+                "results/out_mcmc_gaussian_w_params.txt"
+            ]
         }
     ]
 }

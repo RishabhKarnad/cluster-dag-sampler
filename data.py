@@ -122,7 +122,6 @@ def generate_data_continuous_5(n_samples=100):
     noise = np.sqrt(obs_noise)*np.random.normal(size=(N, nvars))
 
     toporder = g.topological_sorting()
-    print(toporder)
 
     X = np.zeros((N, nvars))
 

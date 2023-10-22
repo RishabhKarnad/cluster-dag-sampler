@@ -32,6 +32,9 @@ class CDAGSampler:
         self.penalize_complexity = penalize_complexity
         self.scores = []
 
+        self.n_samples = N_SAMPLES
+        self.n_warmup = N_WARMUP
+
         self.ctx = {}
 
     def _reset(self):
@@ -47,16 +50,25 @@ class CDAGSampler:
         partitioning = [set(K_i) for K_i in partitioning]
         return partitioning
 
-    def sample(self, n_samples=5000, n_warmup=1000):
-        for i in tqdm(range(n_warmup)):
+    def sample(self, n_samples=N_SAMPLES, n_warmup=N_WARMUP):
+        self.n_samples = n_samples
+        self.n_warmup = n_warmup
+
+        for i in tqdm(range(n_warmup), 'MCMC warmup'):
             K_t, G_t = self.step()
             self.samples.append((K_t, G_t))
 
-        for i in tqdm(range(n_samples)):
+        for i in tqdm(range(n_samples), 'Sampling with MCMC'):
             K_t, G_t = self.step()
             self.samples.append((K_t, G_t))
             self.scores.append(
                 (self.cluster_score(K_t), self.score((K_t, G_t))))
+
+    def get_samples(self):
+        return self.samples[-self.n_samples:-1]
+
+    def get_scores(self):
+        return self.scores[-self.n_samples:-1]
 
     def make_graph_dist(self, scores):
         support = len(scores)
@@ -194,12 +206,12 @@ def test():
         score_C, score_CIC = sampler.scores[i]
         print(f'    C: {C}')
         print(f'    G: {G}')
-        print(f'    cluster score: {score_C}')
+        print(f'    cluster score: {score_C[0]}')
         print(f'    graph_score: {score_CIC}')
     print('=========================')
 
     g_true = np.array([[0, 0, 1, 0], [0, 0, 1, 0], [0, 0, 0, 1], [0, 0, 0, 0]])
-    ecshd = expected_cluster_shd(g_true, sampler.samples[-20:-1])
+    ecshd = expected_cluster_shd(g_true, sampler.get_samples())
     print(f'E-CSHD: {ecshd}')
 
 

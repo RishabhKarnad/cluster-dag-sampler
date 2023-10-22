@@ -1,0 +1,16 @@
+#! /bin/bash
+
+DIR=$(date +"%Y-%m-%d-%T")
+mkdir -p results/$DIR
+
+N_DATA_SAMPLES=100
+N_MCMC_SAMPLES=500
+N_MCMC_WARMUP=100
+
+python run_experiment.py \
+    --data continuous_5 \
+    --n_data_samples $N_DATA_SAMPLES \
+    --n_mcmc_samples $N_MCMC_SAMPLES \
+    --n_mcmc_warmup $N_MCMC_WARMUP \
+    --estimate_parameters \
+    > results/$DIR/out_mcmc_gaussian_w_params.txt
