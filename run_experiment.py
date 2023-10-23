@@ -32,13 +32,6 @@ def make_arg_parser():
     return parser
 
 
-def run_sampler(data, dist, n_samples, n_warmup):
-    sampler = CDAGSampler(data=data, dist=dist)
-    sampler.sample(n_warmup=n_warmup, n_samples=n_samples)
-
-    return sampler
-
-
 def evaluate_samples(sampler, g_true):
     for i, sample in enumerate(sampler.get_samples()):
         print(f'[Sample {i}]')
@@ -95,8 +88,6 @@ if __name__ == '__main__':
     display_sample_statistics(sampler)
 
     if args.estimate_parameters:
-        clgn = ClusterLinearGaussianNetwork(cdag_sampler=sampler)
-
         lgbn = nx.from_numpy_array(
             g_true, create_using=LinearGaussianBayesianNetwork)
         G = nx.from_numpy_array(g_true, create_using=nx.MultiDiGraph())
@@ -115,6 +106,8 @@ if __name__ == '__main__':
         lgbn.add_cpds(*factors)
         joint_dist = lgbn.to_joint_gaussian()
         Cov_true = joint_dist.covariance
+
+        clgn = ClusterLinearGaussianNetwork(cdag_sampler=sampler)
 
         clgn.fit(data, Cov=Cov_true, max_iter=300)
         print('True theta')

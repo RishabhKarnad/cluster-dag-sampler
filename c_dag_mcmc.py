@@ -107,6 +107,9 @@ class CDAGSampler:
 
         if j < len(K_prev) - 1:
             K[j].update(K.pop(j+1))
+        elif j < 2*len(K_prev) - 3:
+            i = j - len(K_prev) + 1
+            K[i], K[i+1] = K[i+1], K[i]
         else:
             i_star = self.find_i_star(K, j)
             c_star = self.find_c_star(K, j, i_star)
@@ -141,6 +144,8 @@ class CDAGSampler:
 
         n_merges = m - 1
 
+        n_reversals = m - 1
+
         n_splits = 0
 
         lim = m or (upto + 1)
@@ -149,7 +154,7 @@ class CDAGSampler:
             for c in range(1, k_i):
                 n_splits += comb(k_i, c)
 
-        return n_merges + n_splits
+        return n_merges + n_reversals + n_splits
 
     def prob_accept(self, K_star):
         K_prev, _ = self.samples[-1]
