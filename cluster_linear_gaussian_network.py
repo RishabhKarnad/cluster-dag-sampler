@@ -10,14 +10,23 @@ from tqdm import tqdm
 # from models.gaussian import GaussianDistribution
 
 
-def to_matrix(C):
-    k = len(C)
+def to_matrix(C, k):
     n = np.sum([len(C_i) for C_i in C])
     m = np.zeros((n, k))
     for i, C_i in enumerate(C):
         for X_j in C_i:
             m[X_j, i] = 1
     return m
+
+
+def zero_pad(A, k):
+    m, n = A.shape
+    p_rows, p_cols = k - m, k-n
+    if p_cols > 0:
+        A = jnp.hstack([A, jnp.zeros((m, p_cols))])
+    if p_rows > 0:
+        A = jnp.vstack([A, jnp.zeros((p_rows, k))])
+    return A
 
 
 class ClusterLinearGaussianNetwork:
@@ -35,11 +44,16 @@ class ClusterLinearGaussianNetwork:
             self.cdag_sampler.sample(
                 n_samples=n_posterior_samples, n_warmup=n_warmup_samples)
 
-        Cs = list(
-            map(lambda G_C: (to_matrix(G_C[0])), self.cdag_sampler.get_samples()))
+        ks = jnp.array(list(
+            map(lambda G_C: len(G_C[0]), self.cdag_sampler.get_samples())))
 
-        Gs = list(
-            map(lambda G_C: G_C[1], self.cdag_sampler.get_samples()))
+        k_max = jnp.max(ks).item()
+
+        Cs = jnp.array(list(
+            map(lambda G_C: (to_matrix(G_C[0], k=k_max)), self.cdag_sampler.get_samples())))
+
+        Gs = jnp.array(list(
+            map(lambda G_C: (zero_pad(G_C[1], k=k_max)), self.cdag_sampler.get_samples())))
 
         key_, subk = random.split(self.key)
         params = {'theta': random.normal(subk, (n, n))}
@@ -58,11 +72,7 @@ class ClusterLinearGaussianNetwork:
         self.theta = params['theta']
 
     def loss(self, X, theta, Cov, Cs, Gs):
-        # return jnp.sum(jax.vmap(self.log_data_likelihood, (None, None, None, 0, 0), 0)(X, theta, Cov, Cs, Gs))
-        l = 0
-        for i in range(len(Cs)):
-            l += self.log_data_likelihood(X, theta, Cov, Cs[i], Gs[i])
-        return -l
+        return -jnp.sum(jax.vmap(self.log_data_likelihood, (None, None, None, 0, 0), 0)(X, theta, Cov, Cs, Gs))
 
     def log_data_likelihood(self, X, theta, Cov, C, G):
         G_expand = C@G@C.T
