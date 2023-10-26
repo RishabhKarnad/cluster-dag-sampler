@@ -32,9 +32,12 @@
                 "10",
                 "--n_mcmc_warmup",
                 "5",
-                "--estimate_parameters",
-                ">",
-                "results/out_mcmc_gaussian_w_params.txt"
+                "--max_em_iters",
+                "2",
+                "--max_mle_iters",
+                "100",
+                "--output_path",
+                "./results/debug"
             ]
         }
     ]

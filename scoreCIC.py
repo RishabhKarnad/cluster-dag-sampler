@@ -3,11 +3,15 @@ from sympy.functions.combinatorial.numbers import stirling
 
 
 class ScoreCIC:
-    def __init__(self, data, dist):
+    def __init__(self, data, dist, parameters):
         m, n = data.shape
         self._dist = dist
-        self.dist = dist(n_vars=n)
-        self.dist.fit(data)
+
+        if parameters is not None:
+            self.dist = dist(n_vars=n, **parameters)
+        else:
+            self.dist = dist(n_vars=n)
+            self.dist.fit(data)
         self.N = m
 
     def total_correlation_all(self, G_C):
