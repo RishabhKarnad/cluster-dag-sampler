@@ -54,12 +54,15 @@ class CDAGSampler:
         self.n_samples = n_samples
         self.n_warmup = n_warmup
 
-        for i in tqdm(range(n_warmup), 'MCMC warmup'):
-            K_t, G_t = self.step()
+        it = tqdm(range(n_warmup), 'MCMC warmup')
+        for i in it:
+            K_t, G_t = self.step(
+                cb=lambda K: it.set_postfix_str(f'{len(K)} clusters'))
             self.samples.append((K_t, G_t))
 
         for i in tqdm(range(n_samples), 'Sampling with MCMC'):
-            K_t, G_t = self.step()
+            K_t, G_t = self.step(
+                cb=lambda K: it.set_postfix_str(f'{len(K)} clusters'))
             self.samples.append((K_t, G_t))
             self.scores.append(
                 (self.cluster_score(K_t), self.score((K_t, G_t))))
@@ -78,13 +81,17 @@ class CDAGSampler:
         return stats.rv_discrete(
             name='categorical', a=0, b=(support), inc=1, values=(np.arange(support), params))
 
-    def step(self):
+    def step(self, cb=None):
         alpha = self.U.rvs()
 
         if alpha < 0.01:
             return self.samples[-1]
         else:
             K_star = self.sample_K()
+
+            if cb is not None:
+                cb(K_star)
+
             u = self.U.rvs()
             a = self.prob_accept(K_star)
             if u < a:
@@ -199,11 +206,11 @@ class CDAGSampler:
 
 
 def test():
-    data, _ = generate_data_discrete_4(n_samples=100)
-    dist = MultivariateBernoulliDistribution
+    data, _ = generate_data_continuous_5(n_samples=100)
+    dist = GaussianDistribution
 
     sampler = CDAGSampler(data=data, dist=dist)
-    sampler.count_neighbours([{1}, {2, 3}, {4, 5}])
+    print(sampler.count_neighbours([{1}, {2, 3}, {4, 5}]))
     sampler.sample(n_warmup=N_WARMUP, n_samples=N_SAMPLES)
     for i, sample in enumerate(sampler.samples[N_WARMUP:-1]):
         print(f'[Sample {i}]')
@@ -215,14 +222,19 @@ def test():
         print(f'    graph_score: {score_CIC}')
     print('=========================')
 
-    g_true = np.array([[0, 0, 1, 0], [0, 0, 1, 0], [0, 0, 0, 1], [0, 0, 0, 0]])
+    g_true = np.array([[0, 1, 1, 0, 0],
+                       [0, 0, 1, 1, 0],
+                       [0, 0, 0, 0, 0],
+                       [0, 0, 0, 0, 1],
+                       [0, 0, 0, 0, 0]])
     ecshd = expected_cluster_shd(g_true, sampler.get_samples())
     print(f'E-CSHD: {ecshd}')
 
 
 if __name__ == '__main__':
-    from data import generate_data_discrete_4
+    from data import generate_data_discrete_4, generate_data_continuous_5
     from models.bernoulli import MultivariateBernoulliDistribution
+    from models.gaussian import GaussianDistribution
     from metrics import expected_cluster_shd
 
     test()
