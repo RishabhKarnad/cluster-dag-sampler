@@ -24,8 +24,8 @@
             "console": "integratedTerminal",
             "justMyCode": true,
             "args": [
-                "--data",
-                "continuous_5",
+                "--score",
+                "CIC",
                 "--n_data_samples",
                 "100",
                 "--n_mcmc_samples",

@@ -10,7 +10,7 @@ MAX_EM_ITERS=20
 MAX_MLE_ITERS=500
 
 python run_experiment.py \
-    --data continuous_5 \
+    --score 'CIC' \
     --n_data_samples $N_DATA_SAMPLES \
     --n_mcmc_samples $N_MCMC_SAMPLES \
     --n_mcmc_warmup $N_MCMC_WARMUP \

@@ -18,7 +18,7 @@ N_SAMPLES = 500
 
 
 class CDAGSampler:
-    def __init__(self, *, data, dist, penalize_complexity=True, parameters=None):
+    def __init__(self, *, data, score, penalize_complexity=True, parameters=None):
         m, n = data.shape
 
         self.n_nodes = n
@@ -28,7 +28,7 @@ class CDAGSampler:
         self.U = stats.uniform(0, 1)
 
         self.data = data
-        self.score = ScoreCIC(data, dist=dist, parameters=parameters)
+        self.score = score
         self.penalize_complexity = penalize_complexity
         self.scores = []
 
