@@ -9,6 +9,8 @@ N_MCMC_SAMPLES=500
 N_MCMC_WARMUP=100
 MAX_EM_ITERS=20
 MAX_MLE_ITERS=500
+MIN_CLUSTERS=3
+MAX_CLUSTERS=4
 
 python run_experiment.py \
     --score 'Bayesian' \
@@ -17,6 +19,8 @@ python run_experiment.py \
     --n_mcmc_warmup $N_MCMC_WARMUP \
     --max_em_iters $MAX_EM_ITERS \
     --max_mle_iters $MAX_MLE_ITERS \
+    --min_clusters $MIN_CLUSTERS \
+    --max_clusters $MAX_CLUSTERS \
     --output_path results/$DIR/bayesian
 
 
@@ -27,4 +31,6 @@ python run_experiment.py \
     --n_mcmc_warmup $N_MCMC_WARMUP \
     --max_em_iters $MAX_EM_ITERS \
     --max_mle_iters $MAX_MLE_ITERS \
+    --min_clusters $MIN_CLUSTERS \
+    --max_clusters $MAX_CLUSTERS \
     --output_path results/$DIR/cic

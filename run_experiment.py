@@ -41,6 +41,8 @@ def make_arg_parser():
 
     parser.add_argument('--max_em_iters', type=int, default=10)
     parser.add_argument('--max_mle_iters', type=int, default=100)
+    parser.add_argument('--min_clusters', type=int, default=None)
+    parser.add_argument('--max_clusters', type=int, default=None)
 
     parser.add_argument('--output_path', type=str)
 
@@ -86,7 +88,7 @@ def display_sample_statistics(samples):
     logging.info(graph_info[:5])
 
 
-def train(data, init_params, score_type, max_em_iters, n_mcmc_samples, n_mcmc_warmup):
+def train(data, init_params, score_type, max_em_iters, n_mcmc_samples, n_mcmc_warmup, min_clusters, max_clusters):
     loss_trace = []
 
     def record_loss_trace(loss_val):
@@ -109,7 +111,8 @@ def train(data, init_params, score_type, max_em_iters, n_mcmc_samples, n_mcmc_wa
         elif score_type == 'Bayesian':
             score = BayesianCDAGScore(data=data, theta=theta, Cov=Cov)
 
-        cdag_sampler = CDAGSampler(data=data, score=score)
+        cdag_sampler = CDAGSampler(
+            data=data, score=score, min_clusters=min_clusters, max_clusters=max_clusters)
         cdag_sampler.sample(n_samples=n_mcmc_samples, n_warmup=n_mcmc_warmup)
 
         clgn = ClusterLinearGaussianNetwork(n_vars=n)
@@ -182,8 +185,14 @@ if __name__ == '__main__':
         'Cov': Cov_true,
     }
 
-    cdag_samples, cdag_scores, theta, loss_trace = train(
-        data, init_params, args.score, args.max_em_iters, args.n_mcmc_samples, args.n_mcmc_warmup)
+    cdag_samples, cdag_scores, theta, loss_trace = train(data,
+                                                         init_params,
+                                                         args.score,
+                                                         args.max_em_iters,
+                                                         args.n_mcmc_samples,
+                                                         args.n_mcmc_warmup,
+                                                         args.min_clusters,
+                                                         args.max_clusters)
 
     evaluate_samples(samples=cdag_samples,
                      scores=cdag_scores, g_true=g_true)
