@@ -16,6 +16,7 @@ from data import generate_data_continuous_5, generate_data_discrete_8, generate_
 from models.gaussian import GaussianDistribution
 # from models.bernoulli import MultivariateBernoulliDistribution
 from scoreCIC import ScoreCIC
+from bayesian_cdag_score import BayesianCDAGScore
 from models.cluster_linear_gaussian_network import ClusterLinearGaussianNetwork
 from metrics import expected_cluster_shd
 from utils.c_dag import stringify_cdag
@@ -91,6 +92,7 @@ def train(data, init_params, score_type, max_em_iters, n_mcmc_samples, n_mcmc_wa
     def record_loss_trace(loss_val):
         loss_trace.append(loss_val)
 
+    m, n = data.shape
     theta, Cov = init_params['theta'], init_params['Cov']
 
     for i in range(max_em_iters):
@@ -101,13 +103,16 @@ def train(data, init_params, score_type, max_em_iters, n_mcmc_samples, n_mcmc_wa
             'cov': Cov,
         }
 
-        score = score_type(
-            data=data, dist=GaussianDistribution, parameters=parameters)
+        if score_type == 'CIC':
+            score = ScoreCIC(
+                data=data, dist=GaussianDistribution, parameters=parameters)
+        elif score_type == 'Bayesian':
+            score = BayesianCDAGScore(data=data, theta=theta, Cov=Cov)
 
         cdag_sampler = CDAGSampler(data=data, score=score)
         cdag_sampler.sample(n_samples=n_mcmc_samples, n_warmup=n_mcmc_warmup)
 
-        clgn = ClusterLinearGaussianNetwork()
+        clgn = ClusterLinearGaussianNetwork(n_vars=n)
 
         samples, scores = cdag_sampler.get_samples(), cdag_sampler.get_scores()
 
@@ -167,11 +172,6 @@ if __name__ == '__main__':
     joint_dist = lgbn.to_joint_gaussian()
     Cov_true = joint_dist.covariance
 
-    if args.score == 'CIC':
-        score_type = ScoreCIC
-    # elif args.score == 'Bayesian':
-    #     score_type = BayesianCDAGScore
-
     key_, subk = random.split(key)
 
     m, n = data.shape
@@ -183,7 +183,7 @@ if __name__ == '__main__':
     }
 
     cdag_samples, cdag_scores, theta, loss_trace = train(
-        data, init_params, score_type, args.max_em_iters, args.n_mcmc_samples, args.n_mcmc_warmup)
+        data, init_params, args.score, args.max_em_iters, args.n_mcmc_samples, args.n_mcmc_warmup)
 
     evaluate_samples(samples=cdag_samples,
                      scores=cdag_scores, g_true=g_true)

@@ -18,7 +18,7 @@ N_SAMPLES = 500
 
 
 class CDAGSampler:
-    def __init__(self, *, data, score, penalize_complexity=True, parameters=None):
+    def __init__(self, *, data, score, parameters=None):
         m, n = data.shape
 
         self.n_nodes = n
@@ -29,7 +29,6 @@ class CDAGSampler:
 
         self.data = data
         self.score = score
-        self.penalize_complexity = penalize_complexity
         self.scores = []
 
         self.n_samples = N_SAMPLES
@@ -202,7 +201,7 @@ class CDAGSampler:
         return UpperTriangular(len(K)).sample_n(n_samples)
 
     def graph_score(self, G_C):
-        return self.score(G_C, penalize_complexity=self.penalize_complexity)
+        return self.score(G_C)
 
 
 def test():
