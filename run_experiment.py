@@ -6,6 +6,7 @@ from pgmpy.models import LinearGaussianBayesianNetwork
 from pgmpy.factors.continuous import LinearGaussianCPD
 import networkx as nx
 import matplotlib.pyplot as plt
+import igraph as ig
 
 import os
 import logging
@@ -19,7 +20,8 @@ from scoreCIC import ScoreCIC
 from bayesian_cdag_score import BayesianCDAGScore
 from models.cluster_linear_gaussian_network import ClusterLinearGaussianNetwork
 from metrics import expected_cluster_shd
-from utils.c_dag import stringify_cdag
+from utils.c_dag import stringify_cdag, unstringify_cdag
+
 
 MCMC_N_WARMUP = 100
 MCMC_N_SAMPLES = 500
@@ -75,7 +77,7 @@ def evaluate_samples(samples, scores, g_true):
     logging.info(f'E-CSHD: {ecshd}')
 
 
-def display_sample_statistics(samples):
+def display_sample_statistics(samples, filepath):
     graph_counts = {}
     for graph in samples:
         graph_string = stringify_cdag(graph)
@@ -86,6 +88,28 @@ def display_sample_statistics(samples):
     graph_counts = [graph_counts[g] for g in graphs]
     graph_info = list(zip(graphs, graph_counts))
     logging.info(graph_info[:5])
+
+    visualize_graphs(graphs[:5], filepath)
+
+
+def plot_graph(g, filepath):
+    c = g[0]
+    graphstring = stringify_cdag(g)
+    g = ig.Graph.Adjacency(g[1].tolist())
+    ig.plot(g,
+            f'{filepath}/{graphstring}.png',
+            vertex_size=75,
+            vertex_color='grey',
+            vertex_label=c,
+            layout='circle',
+            bbox=(0, 0, 300, 300),
+            margin=50)
+
+
+def visualize_graphs(graphs, filepath):
+    graphs = [unstringify_cdag(g) for g in graphs]
+    for graph in graphs:
+        plot_graph(graph, filepath)
 
 
 def train(data, init_params, score_type, max_em_iters, n_mcmc_samples, n_mcmc_warmup, min_clusters, max_clusters):
@@ -196,7 +220,7 @@ if __name__ == '__main__':
 
     evaluate_samples(samples=cdag_samples,
                      scores=cdag_scores, g_true=g_true)
-    display_sample_statistics(cdag_samples)
+    display_sample_statistics(cdag_samples, filepath=args.output_path)
 
     logging.info('True theta')
     logging.info(theta_true)

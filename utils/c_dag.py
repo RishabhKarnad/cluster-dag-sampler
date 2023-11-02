@@ -25,7 +25,7 @@ def unstringify_cdag(cdag_string):
     C = C_stringified.split('-')
     C = [set(map(int, c_i.split(','))) for c_i in C]
     n = len(C)
-    E_C = list(map(int, E_C_stringified.split(',')))
+    E_C = list(map(int, map(float, E_C_stringified.split(','))))
     E_C = np.array(E_C).reshape(n, n)
     return C, E_C
 
