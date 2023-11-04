@@ -62,7 +62,8 @@ class CDAGSampler:
                 cb=lambda K: it.set_postfix_str(f'{len(K)} clusters'))
             self.samples.append((K_t, G_t))
 
-        for i in tqdm(range(n_samples), 'Sampling with MCMC'):
+        it = tqdm(range(n_samples), 'Sampling with MCMC')
+        for i in it:
             K_t, G_t = self.step(
                 cb=lambda K: it.set_postfix_str(f'{len(K)} clusters'))
             self.samples.append((K_t, G_t))
@@ -95,8 +96,8 @@ class CDAGSampler:
                 cb(K_star)
 
             u = self.U.rvs()
-            a = self.prob_accept(K_star)
-            if u < a:
+            a = self.log_prob_accept(K_star)
+            if np.log(u) < a:
                 graph_index = self.make_graph_dist(
                     self.ctx['graph_scores']).rvs()
                 graph = self.ctx['graphs'][graph_index]
@@ -176,7 +177,7 @@ class CDAGSampler:
             'total_upto': n_neighbours_upto,
         }
 
-    def prob_accept(self, K_star):
+    def log_prob_accept(self, K_star):
         K_prev, _ = self.samples[-1]
 
         nbd_K_star = self.count_neighbours(K_star)['total']
@@ -191,9 +192,10 @@ class CDAGSampler:
         self.ctx['graph_scores'] = graph_scores
         self.ctx['prev_graph_scores'] = prev_graph_scores
 
-        rho = (nbd_K_prev * prob_K_star) / (nbd_K_star * prob_K_prev)
+        rho = ((np.log(nbd_K_prev) + prob_K_star)
+               - (np.log(nbd_K_star) + prob_K_prev))
 
-        return min(1.0, rho)
+        return min(0, rho)
 
     def cluster_score(self, K):
         score = 0
