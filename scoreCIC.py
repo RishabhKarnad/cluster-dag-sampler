@@ -3,7 +3,7 @@ from sympy.functions.combinatorial.numbers import stirling
 
 
 class ScoreCIC:
-    def __init__(self, data, dist, parameters):
+    def __init__(self, data, dist, parameters=None):
         m, n = data.shape
         self._dist = dist
 

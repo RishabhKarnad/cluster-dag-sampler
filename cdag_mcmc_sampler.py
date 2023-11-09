@@ -18,13 +18,17 @@ N_SAMPLES = 500
 
 
 class CDAGSampler:
-    def __init__(self, *, data, score, min_clusters=None, max_clusters=None):
+    def __init__(self, *, data, score, min_clusters=None, max_clusters=None, initial_sample=None):
         m, n = data.shape
 
         self.n_nodes = n
-        K_init = self.make_random_partitioning()
-        G_init = UpperTriangular(len(K_init)).sample()
-        self.samples = [(K_init, G_init)]
+
+        if initial_sample is None:
+            K_init = self.make_random_partitioning()
+            G_init = UpperTriangular(len(K_init)).sample()
+            initial_sample = (K_init, G_init)
+
+        self.samples = [initial_sample]
         self.U = stats.uniform(0, 1)
 
         self.min_clusters = min_clusters or 2
@@ -39,9 +43,7 @@ class CDAGSampler:
 
         self.ctx = {}
 
-    def _reset(self):
-        K_init = self.make_random_partitioning()
-        G_init = UpperTriangular(len(K_init)).sample()
+    def _reset(self, K_init, G_init):
         self.samples = [(K_init, G_init)]
         self.scores = []
 

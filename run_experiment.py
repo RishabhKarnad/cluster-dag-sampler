@@ -7,6 +7,7 @@ from pgmpy.factors.continuous import LinearGaussianCPD
 import networkx as nx
 import matplotlib.pyplot as plt
 import igraph as ig
+from itertools import chain
 
 import os
 import logging
@@ -89,15 +90,13 @@ def display_sample_statistics(samples, filepath):
     graph_info = list(zip(graphs, graph_counts))
     logging.info(graph_info[:5])
 
-    visualize_graphs(graphs[:5], filepath)
 
-
-def plot_graph(g, filepath):
+def plot_graph(g, target):
     c = g[0]
     graphstring = stringify_cdag(g)
     g = ig.Graph.Adjacency(g[1].tolist())
     ig.plot(g,
-            f'{filepath}/{graphstring}.png',
+            target,
             vertex_size=75,
             vertex_color='grey',
             vertex_label=c,
@@ -106,20 +105,65 @@ def plot_graph(g, filepath):
             margin=50)
 
 
-def visualize_graphs(graphs, filepath):
-    graphs = [unstringify_cdag(g) for g in graphs]
+def visualize_graphs(graphs, filename):
+    graph_counts = {}
     for graph in graphs:
-        plot_graph(graph, filepath)
+        graph_string = stringify_cdag(graph)
+        if graph_string not in graph_counts:
+            graph_counts[graph_string] = 0
+        graph_counts[graph_string] += 1
+    graphs = sorted(graph_counts, key=graph_counts.get, reverse=True)
+    graph_counts = [graph_counts[g] for g in graphs]
+    graph_info = list(zip(graphs, graph_counts))
+    logging.info(graph_info[:5])
+    graphs = [unstringify_cdag(g) for g in graphs]
+
+    ncols = 2
+    nrows = int(np.ceil(len(graphs) / 2))
+
+    px = 1/plt.rcParams['figure.dpi']  # pixel in inches
+    fig, ax = plt.subplots(nrows, ncols, figsize=(ncols*350*px, nrows*350*px))
+    ax = ax.reshape(nrows, ncols)
+    i, j = 0, 0
+    for ni in range(nrows):
+        for nj in range(ncols):
+            ax[ni, nj].axis('off')
+    for graph in graphs:
+        plot_graph(graph, ax[i, j])
+        if j+1 == ncols:
+            j = 0
+            i += 1
+        else:
+            j += 1
+    plt.subplots_adjust(wspace=0, hspace=0)
+    plt.savefig(f'{filename}.png')
+    plt.clf()
+
+
+def plot_graph_scores(scores, opt_score, filepath):
+    lengths = [len(s) for s in scores]
+    scores = list(chain(*scores))
+    scores = list(map(lambda x: x[1].item(), scores))
+    plt.plot(scores)
+    for l in lengths:
+        plt.axvline(l, color='green')
+    plt.axhline(opt_score, color='red')
+    plt.savefig(f'{filepath}/scores.png')
+    plt.clf()
 
 
 def train(data, init_params, score_type, max_em_iters, n_mcmc_samples, n_mcmc_warmup, min_clusters, max_clusters):
     loss_trace = []
+    samples = []
+    scores = []
 
     def record_loss_trace(loss_val):
         loss_trace.append(loss_val)
 
     m, n = data.shape
     theta, Cov = init_params['theta'], init_params['Cov']
+
+    initial_cdag_sample = None
 
     for i in range(max_em_iters):
         print(f'EM iteration {i+1}/{max_em_iters}')
@@ -133,36 +177,45 @@ def train(data, init_params, score_type, max_em_iters, n_mcmc_samples, n_mcmc_wa
             score = ScoreCIC(
                 data=data, dist=GaussianDistribution, parameters=parameters)
         elif score_type == 'Bayesian':
-            score = BayesianCDAGScore(data=data, theta=theta, Cov=Cov)
+            score = BayesianCDAGScore(data=data,
+                                      theta=theta,
+                                      Cov=Cov,
+                                      min_clusters=min_clusters,
+                                      mean_clusters=max_clusters,
+                                      max_clusters=max_clusters)
 
-        cdag_sampler = CDAGSampler(
-            data=data, score=score, min_clusters=min_clusters, max_clusters=max_clusters)
+        cdag_sampler = CDAGSampler(data=data,
+                                   score=score,
+                                   min_clusters=min_clusters,
+                                   max_clusters=max_clusters,
+                                   initial_sample=initial_cdag_sample)
+
         cdag_sampler.sample(n_samples=n_mcmc_samples, n_warmup=n_mcmc_warmup)
 
         clgn = ClusterLinearGaussianNetwork(n_vars=n)
 
-        samples, scores = cdag_sampler.get_samples(), cdag_sampler.get_scores()
+        samples_i, scores_i = cdag_sampler.get_samples(), cdag_sampler.get_scores()
+
+        initial_cdag_sample = samples_i[-1]
 
         clgn.fit(data,
                  theta=theta,
                  Cov=Cov,
                  max_mle_iters=args.max_mle_iters,
-                 samples=samples,
-                 scores=scores,
+                 samples=samples_i,
+                 scores=scores_i,
                  cb=record_loss_trace)
 
         theta = clgn.theta
 
+        samples.append(samples_i)
+        scores.append(scores_i)
+
     return samples, scores, theta, loss_trace
 
 
-if __name__ == '__main__':
-    parser = make_arg_parser()
-    args = parser.parse_args()
-
+def main(args):
     key = random.PRNGKey(args.random_seed)
-
-    initialize_logger(output_path=args.output_path)
 
     # dist = (MultivariateBernoulliDistribution
     #         if args.data in ['discrete_4', 'discrete_8']
@@ -218,9 +271,34 @@ if __name__ == '__main__':
                                                          args.min_clusters,
                                                          args.max_clusters)
 
-    evaluate_samples(samples=cdag_samples,
-                     scores=cdag_scores, g_true=g_true)
-    display_sample_statistics(cdag_samples, filepath=args.output_path)
+    evaluate_samples(samples=cdag_samples[-1],
+                     scores=cdag_scores[-1], g_true=g_true)
+    display_sample_statistics(cdag_samples[-1], filepath=args.output_path)
+
+    for i, graphs in enumerate(cdag_samples):
+        visualize_graphs(graphs[:5], f'{args.output_path}/iter-{i}.png')
+
+    opt_cdag = ([{0, 1, 2}, {3}, {4}],
+                np.array([[0, 1, 0], [0, 0, 1], [0, 0, 0]]))
+
+    if args.score == 'CIC':
+        parameters = {
+            'mean': np.array((data@theta_true).mean(axis=0)),
+            'cov': Cov_true,
+        }
+        score = ScoreCIC(
+            data=data, dist=GaussianDistribution, parameters=parameters)
+    elif args.score == 'Bayesian':
+        score = BayesianCDAGScore(data=data,
+                                  theta=theta_true,
+                                  Cov=Cov_true,
+                                  min_clusters=args.min_clusters,
+                                  mean_clusters=args.max_clusters,
+                                  max_clusters=args.max_clusters)
+
+    opt_score = score(opt_cdag)
+
+    plot_graph_scores(cdag_scores, opt_score, args.output_path)
 
     logging.info('True theta')
     logging.info(theta_true)
@@ -233,3 +311,12 @@ if __name__ == '__main__':
 
     plt.plot(loss_trace)
     plt.savefig(f'{args.output_path}/loss_trace.png')
+
+
+if __name__ == '__main__':
+    parser = make_arg_parser()
+    args = parser.parse_args()
+
+    initialize_logger(output_path=args.output_path)
+
+    main(args)
