@@ -10,6 +10,8 @@ from tqdm import tqdm
 from scoreCIC import ScoreCIC
 from models.upper_triangular import UpperTriangular
 
+from utils.sys import debugger_is_active
+
 
 MAX_PARENTS = 2
 
@@ -18,13 +20,16 @@ N_SAMPLES = 500
 
 
 class ProposalDistribution:
-    def __init__(self, C):
+    def __init__(self, C, min_clusters, max_clusters):
         self.C = C
         self.k = len(C)
 
         self.neighbours = []
         self.neighbour_counts = []
         self.total_neighbours = 0
+
+        self.min_clusters = min_clusters
+        self.max_clusters = max_clusters
 
         self.populate_neighbours()
 
@@ -34,18 +39,20 @@ class ProposalDistribution:
         self.neighbour_counts.append(0)
 
         # Merges
-        for i in range(self.k-1):
-            self.neighbours.append(f'merge-{i}')
-            last_count = self.neighbour_counts[-1]
-            self.neighbour_counts.append(last_count+1)
+        if self.max_clusters > self.k:
+            for i in range(self.k-1):
+                self.neighbours.append(f'merge-{i}')
+                last_count = self.neighbour_counts[-1]
+                self.neighbour_counts.append(last_count+1)
 
         # Splits
-        for i in range(self.k):
-            for c in range(1, len(self.C[i])):
-                self.neighbours.append(f'split-{i}-{c}')
-                last_count = self.neighbour_counts[-1]
-                self.neighbour_counts.append(
-                    last_count + comb(len(self.C[i]), c))
+        if self.min_clusters < self.k:
+            for i in range(self.k):
+                for c in range(1, len(self.C[i])):
+                    self.neighbours.append(f'split-{i}-{c}')
+                    last_count = self.neighbour_counts[-1]
+                    self.neighbour_counts.append(
+                        last_count + comb(len(self.C[i]), c))
 
         # Reversals
         for i in range(self.k-1):
@@ -139,6 +146,8 @@ class CDAGSampler:
 
         self.ctx = {}
 
+        self.debug = debugger_is_active()
+
     def _reset(self, K_init, G_init):
         self.samples = [(K_init, G_init)]
         self.scores = []
@@ -154,13 +163,13 @@ class CDAGSampler:
         self.n_samples = n_samples
         self.n_warmup = n_warmup
 
-        it = tqdm(range(n_warmup), 'MCMC warmup')
+        it = tqdm(range(n_warmup), 'MCMC warmup', disable=self.debug)
         for i in it:
             K_t, G_t = self.step(
                 cb=lambda K: it.set_postfix_str(f'{len(K)} clusters'))
             self.samples.append((K_t, G_t))
 
-        it = tqdm(range(n_samples), 'Sampling with MCMC')
+        it = tqdm(range(n_samples), 'Sampling with MCMC', disable=self.debug)
         for i in it:
             K_t, G_t = self.step(
                 cb=lambda K: it.set_postfix_str(f'{len(K)} clusters'))
@@ -190,7 +199,8 @@ class CDAGSampler:
             return self.samples[-1]
         else:
             K_prev, _ = self.samples[-1]
-            K_star = ProposalDistribution(K_prev).sample()
+            K_star = ProposalDistribution(
+                K_prev, self.min_clusters, self.max_clusters).sample()
 
             if cb is not None:
                 cb(K_star)
@@ -211,10 +221,10 @@ class CDAGSampler:
     def log_prob_accept(self, K_star):
         K_prev, _ = self.samples[-1]
 
-        # nbd_K_star = ProposalDistribution(K_star).total_neighbours
-        log_q_K_prev = ProposalDistribution(K_star).logpdf(K_prev)
-        # nbd_K_prev = ProposalDistribution(K_prev).total_neighbours
-        log_q_K_star = ProposalDistribution(K_prev).logpdf(K_star)
+        log_q_K_prev = ProposalDistribution(
+            K_star, self.min_clusters, self.max_clusters).logpdf(K_prev)
+        log_q_K_star = ProposalDistribution(
+            K_prev, self.min_clusters, self.max_clusters).logpdf(K_star)
 
         log_prob_K_star, graphs, graph_scores = self.cluster_score(K_star)
         log_prob_K_prev, prev_graphs, prev_graph_scores = self.cluster_score(
