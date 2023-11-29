@@ -1,4 +1,5 @@
 import numpy as np
+import scipy.stats as stats
 
 from models.truncated_poisson import TruncatedPoisson
 from models.clustering_distribution import ClusteringDistribution
@@ -42,7 +43,11 @@ class CDAGJointDistribution:
     def logpmf(self, C, G, X):
         k = len(C)
         C = to_matrix(C, len(C))
-        return (TruncatedPoisson(self.min_clusters, self.mean_clusters, self.max_clusters).logpmf(k)
+        # return (TruncatedPoisson(self.min_clusters, self.mean_clusters, self.max_clusters).logpmf(k)
+        #         + self.cluster_prior(self.n_vars, k).logpmf(C)
+        #         + self.graph_prior(self.n_vars).logpmf(G)
+        #         + self.likelihood(self.n_vars).logpmf(X, self.theta, self.Cov, C, G))
+        return (stats.randint(self.min_clusters, self.max_clusters+1).logpmf(k)
                 + self.cluster_prior(self.n_vars, k).logpmf(C)
                 + self.graph_prior(self.n_vars).logpmf(G)
                 + self.likelihood(self.n_vars).logpmf(X, self.theta, self.Cov, C, G))
