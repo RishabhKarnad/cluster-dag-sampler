@@ -14,7 +14,8 @@ import logging
 import csv
 
 from cdag_mcmc_sampler import CDAGSampler
-from data.data import generate_data_continuous_5, generate_data_discrete_8, generate_data_discrete_4
+from data.continuous import generate_data_continuous_5
+from data.discrete import generate_data_discrete_8, generate_data_discrete_4
 from models.gaussian import GaussianDistribution
 # from models.bernoulli import MultivariateBernoulliDistribution
 from scores.cic_score import ScoreCIC

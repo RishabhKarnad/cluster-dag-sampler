@@ -287,7 +287,8 @@ def test():
 
 
 if __name__ == '__main__':
-    from data.data import generate_data_discrete_4, generate_data_continuous_5
+    from data.continuous import generate_data_continuous_5
+    from data.discrete import generate_data_discrete_4
     from models.bernoulli import MultivariateBernoulliDistribution
     from models.gaussian import GaussianDistribution
     from utils.metrics import expected_cluster_shd

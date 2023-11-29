@@ -117,7 +117,8 @@ def test():
 
 
 if __name__ == '__main__':
-    from data.data import generate_data_continuous, generate_data_discrete_8, generate_data_discrete_4
+    from data.continuous import generate_data_continuous
+    from data.discrete import generate_data_discrete_8, generate_data_discrete_4
     from models.gaussian import GaussianDistribution
     from models.bernoulli import MultivariateBernoulliDistribution
 
