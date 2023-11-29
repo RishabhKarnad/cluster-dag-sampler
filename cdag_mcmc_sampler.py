@@ -160,13 +160,13 @@ class CDAGSampler:
         self.n_samples = n_samples
         self.n_warmup = n_warmup
 
-        it = tqdm(range(n_warmup), 'MCMC warmup', disable=self.debug)
+        it = tqdm(range(n_warmup), 'MCMC warmup')
         for i in it:
             K_t, G_t = self.step(
                 cb=lambda K: it.set_postfix_str(f'{len(K)} clusters'))
             self.samples.append((K_t, G_t))
 
-        it = tqdm(range(n_samples), 'Sampling with MCMC', disable=self.debug)
+        it = tqdm(range(n_samples), 'Sampling with MCMC')
         for i in it:
             K_t, G_t = self.step(
                 cb=lambda K: it.set_postfix_str(f'{len(K)} clusters'))
