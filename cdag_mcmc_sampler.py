@@ -17,22 +17,118 @@ N_WARMUP = 100
 N_SAMPLES = 500
 
 
+class ProposalDistribution:
+    def __init__(self, C):
+        self.C = C
+        self.k = len(C)
+
+        self.neighbours = []
+        self.neighbour_counts = []
+        self.total_neighbours = 0
+
+        self.populate_neighbours()
+
+    def populate_neighbours(self):
+        # For convenience, popped later
+        self.neighbours.append(None)
+        self.neighbour_counts.append(0)
+
+        # Merges
+        for i in range(self.k-1):
+            self.neighbours.append(f'merge-{i}')
+            last_count = self.neighbour_counts[-1]
+            self.neighbour_counts.append(last_count+1)
+
+        # Splits
+        for i in range(self.k):
+            for c in range(1, len(self.C[i])):
+                self.neighbours.append(f'split-{i}-{c}')
+                last_count = self.neighbour_counts[-1]
+                self.neighbour_counts.append(
+                    last_count + comb(len(self.C[i]), c))
+
+        # Reversals
+        for i in range(self.k-1):
+            self.neighbours.append(f'reverse-{i}')
+            last_count = self.neighbour_counts[-1]
+            self.neighbour_counts.append(last_count+1)
+
+        # Exchanges
+        for i in range(self.k-1):
+            for c1 in range(1, len(self.C[i])):
+                for c2 in range(1, len(self.C[i+1])):
+                    self.neighbours.append(f'exchange-{i}-{c1}-{c2}')
+                    last_count = self.neighbour_counts[-1]
+                    self.neighbour_counts.append(
+                        last_count + (comb(len(self.C[i]), c1) * comb(len(self.C[i+1]), c2)))
+
+        self.total_neighbours = self.neighbour_counts[-1]
+
+        # Remove the placeholders added in first line of this method
+        self.neighbours.pop(0)
+        self.neighbour_counts.pop(0)
+
+    def gen_neighbour(self, spec):
+        neighbour = deepcopy(self.C)
+
+        match spec.split('-'):
+            case ['merge', i]:
+                i = int(i)
+                neighbour[i].update(neighbour.pop(i+1))
+            case ['split', i, c]:
+                i, c = int(i), int(c)
+                c_new = set(np.random.choice(
+                    sorted(neighbour[i]), c, replace=False))
+                neighbour[i] -= c_new
+                neighbour.insert(i + 1, c_new)
+            case ['reverse', i]:
+                i = int(i)
+                neighbour[i], neighbour[i+1] = neighbour[i+1], neighbour[i]
+            case ['exchange', i, c1, c2]:
+                i, c1, c2 = int(i), int(c1), int(c2)
+                c1_subset = set(np.random.choice(
+                    sorted(neighbour[i]), c1, replace=False))
+                c2_subset = set(np.random.choice(
+                    sorted(neighbour[i+1]), c2, replace=False))
+                neighbour[i] -= c1_subset
+                neighbour[i+1].update(c1_subset)
+                neighbour[i+1] -= c2_subset
+                neighbour[i].update(c2_subset)
+
+        return neighbour
+
+    def sample(self):
+        j = stats.randint(0, self.total_neighbours).rvs()
+        for idx in reversed(range(len(self.neighbour_counts))):
+            if j < self.neighbour_counts[idx]:
+                return self.gen_neighbour(self.neighbours[idx])
+        raise RuntimeError('No neighbours were generated')
+
+    def pdf(self, C_star):
+        # Uniform probability over neighbours
+        return 1 / self.total_neighbours
+
+    def logpdf(self, C_star):
+        # Uniform probability over neighbours
+        return -np.log(self.total_neighbours)
+
+
 class CDAGSampler:
     def __init__(self, *, data, score, min_clusters=None, max_clusters=None, initial_sample=None):
         m, n = data.shape
 
         self.n_nodes = n
 
+        self.min_clusters = min_clusters or 2
+        self.max_clusters = max_clusters or n
+
         if initial_sample is None:
-            K_init = self.make_random_partitioning()
+            K_init = self.make_random_partitioning(self.max_clusters)
             G_init = UpperTriangular(len(K_init)).sample()
             initial_sample = (K_init, G_init)
 
         self.samples = [initial_sample]
         self.U = stats.uniform(0, 1)
-
-        self.min_clusters = min_clusters or 2
-        self.max_clusters = max_clusters or n
 
         self.data = data
         self.score = score
@@ -47,10 +143,10 @@ class CDAGSampler:
         self.samples = [(K_init, G_init)]
         self.scores = []
 
-    def make_random_partitioning(self):
+    def make_random_partitioning(self, n_partitions):
         variables = range(self.n_nodes)
         variables = np.random.permutation(variables)
-        partitioning = np.array_split(variables, self.n_nodes // 2)
+        partitioning = np.array_split(variables, n_partitions)
         partitioning = [set(K_i) for K_i in partitioning]
         return partitioning
 
@@ -90,9 +186,11 @@ class CDAGSampler:
         alpha = self.U.rvs()
 
         if alpha < 0.01:
+            # Small probability of staying in same state to make Markov Chain ergodic
             return self.samples[-1]
         else:
-            K_star = self.sample_K()
+            K_prev, _ = self.samples[-1]
+            K_star = ProposalDistribution(K_prev).sample()
 
             if cb is not None:
                 cb(K_star)
@@ -110,83 +208,16 @@ class CDAGSampler:
                 graph = self.ctx['prev_graphs'][graph_index]
                 return self.samples[-1][0], graph
 
-    def sample_K(self):
-        K_prev, _ = self.samples[-1]
-        K = deepcopy(K_prev)
-
-        n_neighbours = self.count_neighbours(K_prev)
-        j = stats.randint(0, n_neighbours['total']).rvs()
-
-        if j < n_neighbours['merges']:
-            K[j].update(K.pop(j+1))
-        elif j < n_neighbours['merges'] + n_neighbours['reversals']:
-            i = j - n_neighbours['merges']
-            K[i], K[i+1] = K[i+1], K[i]
-        else:
-            i_star = self.find_i_star(K, j, n_neighbours['total_upto'])
-            c_star = self.find_c_star(K, j, i_star, n_neighbours['total_upto'])
-            if c_star != len(K[i_star]):
-                c_new = set(np.random.choice(
-                    sorted(K[i_star]), c_star, replace=False))
-                K[i_star] -= c_new
-                K.insert(i_star + 1, c_new)
-            else:
-                print('BAD')
-
-        return K
-
-    def find_i_star(self, K, j, n_neighbours_upto):
-        for i_lim in range(len(K)):
-            if j < n_neighbours_upto[i_lim+1]:
-                return i_lim
-
-    def find_c_star(self, K, j, i_star, n_neighbours_upto):
-        k_i_star = len(K[i_star])
-
-        n_neighbours_until_i_star = n_neighbours_upto[i_star]
-
-        for c_lim in range(1, len(K[i_star])):
-            n_splits_c_lim = np.sum([comb(k_i_star, c)
-                                    for c in range(1, c_lim+1)])
-            if j < n_neighbours_until_i_star + n_splits_c_lim:
-                return c_lim
-
-    def count_neighbours(self, K):
-        m = len(K)
-
-        n_merges = m - 1 if self.min_clusters < m else 0
-
-        n_reversals = m - 1
-
-        n_splits = 0
-        n_neighbours_upto = [n_merges + n_reversals]
-
-        if self.max_clusters > m:
-            for i in range(m):
-                k_i = len(K[i])
-                for c in range(1, k_i):
-                    n_splits += comb(k_i, c)
-
-                n_neighbours_upto.append(n_merges + n_reversals + n_splits)
-
-        n_neighbours = n_merges + n_reversals + n_splits
-
-        return {
-            'total': n_neighbours,
-            'merges': n_merges,
-            'reversals': n_reversals,
-            'splits': n_splits,
-            'total_upto': n_neighbours_upto,
-        }
-
     def log_prob_accept(self, K_star):
         K_prev, _ = self.samples[-1]
 
-        nbd_K_star = self.count_neighbours(K_star)['total']
-        nbd_K_prev = self.count_neighbours(K_prev)['total']
+        # nbd_K_star = ProposalDistribution(K_star).total_neighbours
+        log_q_K_prev = ProposalDistribution(K_star).logpdf(K_prev)
+        # nbd_K_prev = ProposalDistribution(K_prev).total_neighbours
+        log_q_K_star = ProposalDistribution(K_prev).logpdf(K_star)
 
-        prob_K_star, graphs, graph_scores = self.cluster_score(K_star)
-        prob_K_prev, prev_graphs, prev_graph_scores = self.cluster_score(
+        log_prob_K_star, graphs, graph_scores = self.cluster_score(K_star)
+        log_prob_K_prev, prev_graphs, prev_graph_scores = self.cluster_score(
             K_prev)
 
         self.ctx['graphs'] = graphs
@@ -194,8 +225,8 @@ class CDAGSampler:
         self.ctx['graph_scores'] = graph_scores
         self.ctx['prev_graph_scores'] = prev_graph_scores
 
-        rho = ((np.log(nbd_K_prev) + prob_K_star)
-               - (np.log(nbd_K_star) + prob_K_prev))
+        rho = ((log_q_K_prev + log_prob_K_star)
+               - (log_q_K_star + log_prob_K_prev))
 
         return min(0, rho)
 
