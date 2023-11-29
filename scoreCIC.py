@@ -3,11 +3,15 @@ from sympy.functions.combinatorial.numbers import stirling
 
 
 class ScoreCIC:
-    def __init__(self, data, dist):
+    def __init__(self, data, dist, parameters=None):
         m, n = data.shape
         self._dist = dist
-        self.dist = dist(n_vars=n)
-        self.dist.fit(data)
+
+        if parameters is not None:
+            self.dist = dist(n_vars=n, **parameters)
+        else:
+            self.dist = dist(n_vars=n)
+            self.dist.fit(data)
         self.N = m
 
     def total_correlation_all(self, G_C):
@@ -59,8 +63,8 @@ class ScoreCIC:
                 # + (np.sum([[X_i for X_i in list(K_i)] for K_i in C]))
                 )
 
-    def __call__(self, G_C, *, penalize_complexity=True):
-        penalty = self.penalty(G_C) if penalize_complexity else 0
+    def __call__(self, G_C):
+        penalty = self.penalty(G_C)
         N = self.N
         return (2 * N * (self.total_correlation_all(G_C) + self.g2(G_C) - self.pairwise_MI_all(G_C))
                 - (np.log2(N) * penalty / 2))
