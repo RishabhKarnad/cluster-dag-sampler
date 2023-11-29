@@ -5,9 +5,6 @@ from copy import deepcopy
 from dataclasses import dataclass
 from tqdm import tqdm
 
-# from ER import ErdosReniDAGDistribution
-# from BGe import BGe
-from scoreCIC import ScoreCIC
 from models.upper_triangular import UpperTriangular
 
 from utils.sys import debugger_is_active
@@ -290,9 +287,9 @@ def test():
 
 
 if __name__ == '__main__':
-    from data import generate_data_discrete_4, generate_data_continuous_5
+    from data.data import generate_data_discrete_4, generate_data_continuous_5
     from models.bernoulli import MultivariateBernoulliDistribution
     from models.gaussian import GaussianDistribution
-    from metrics import expected_cluster_shd
+    from utils.metrics import expected_cluster_shd
 
     test()

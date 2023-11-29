@@ -106,10 +106,10 @@ def find_cdag(data, *, score, steps=100, rho=0.5):
 
 
 def main():
-    from scoreCIC import ScoreCIC
+    from scores.cic_score import ScoreCIC
     # from models.bernoulli import MultivariateBernoulliDistribution
     from models.gaussian import GaussianDistribution
-    from data import generate_data_discrete_8, generate_data_discrete_4, generate_data_continuous_5
+    from data.data import generate_data_discrete_8, generate_data_discrete_4, generate_data_continuous_5
     import matplotlib.pyplot as plt
 
     # data = generate_data_discrete_v2(n_samples=1000)

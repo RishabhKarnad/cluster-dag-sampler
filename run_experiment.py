@@ -14,13 +14,13 @@ import logging
 import csv
 
 from cdag_mcmc_sampler import CDAGSampler
-from data import generate_data_continuous_5, generate_data_discrete_8, generate_data_discrete_4
+from data.data import generate_data_continuous_5, generate_data_discrete_8, generate_data_discrete_4
 from models.gaussian import GaussianDistribution
 # from models.bernoulli import MultivariateBernoulliDistribution
-from scoreCIC import ScoreCIC
-from bayesian_cdag_score import BayesianCDAGScore
+from scores.cic_score import ScoreCIC
+from scores.bayesian_cdag_score import BayesianCDAGScore
 from models.cluster_linear_gaussian_network import ClusterLinearGaussianNetwork
-from metrics import expected_cluster_shd
+from utils.metrics import expected_cluster_shd
 from utils.c_dag import stringify_cdag, unstringify_cdag
 
 
