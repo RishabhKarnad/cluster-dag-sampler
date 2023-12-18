@@ -307,8 +307,9 @@ def main(args):
     logging.info(theta)
 
     with open(f'{args.output_path}/loss_trace.csv', 'w', newline='') as loss_trace_file:
-        wr = csv.writer(loss_trace_file, quoting=csv.QUOTE_ALL)
-        wr.writerow(loss_trace)
+        wr = csv.writer(loss_trace_file)
+        loss_trace = list(map(lambda x: [x], loss_trace))
+        wr.writerows(loss_trace)
 
     plt.plot(loss_trace)
     plt.savefig(f'{args.output_path}/loss_trace.png')
