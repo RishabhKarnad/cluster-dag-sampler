@@ -75,4 +75,59 @@ def generate_data_continuous_5(n_samples=100):
         else:
             X[:, j] = noise[:, j]
 
-    return X, (adjacency_matrix, theta)
+    Cov = np.array([[0.1, 0.1, 0.0, 0.2, 0.6],
+                    [0.1, 0.2, -0.1, 0.4, 1.2],
+                    [0.0, -0.1, 0.2, -0.2, -0.6],
+                    [0.2, 0.4, -0.2, 0.9, 2.7],
+                    [0.6, 1.2, -0.6, 2.7, 8.1]])
+
+    return X, (adjacency_matrix, theta, Cov)
+
+
+def generate_data_continuous_faithful(n_samples=100):
+    adjacency_matrix = np.zeros((5, 5))
+    adjacency_matrix[1, 0] = 1
+    adjacency_matrix[1, 2] = 1
+    adjacency_matrix[2, 0] = 1
+    adjacency_matrix[3, 2] = 1
+    adjacency_matrix[3, 4] = 1
+
+    G = nx.from_numpy_array(adjacency_matrix, create_using=nx.MultiDiGraph())
+    g = ig.Graph.from_networkx(G)
+    g.vs['label'] = g.vs['_nx_name']
+
+    obs_noise = 0.1
+    N = n_samples
+    nvars = len(g.vs)
+
+    theta = np.random.normal(size=(nvars, nvars)) * 100
+    theta[1, 0] = 5
+    theta[1, 2] = 7
+    theta[2, 0] = 6
+    theta[3, 2] = 2
+    theta[3, 4] = 3
+
+    noise = np.sqrt(obs_noise)*np.random.normal(size=(N, nvars))
+
+    toporder = g.topological_sorting()
+
+    X = np.zeros((N, nvars))
+
+    for j in toporder:
+        parent_edges = g.incident(j, mode='in')
+        parents = list(g.es[e].source for e in parent_edges)
+
+        if parents:
+            mean = X[:, np.array(parents)] @ theta[np.array(parents), j]
+            X[:, j] = mean + noise[:, j]
+
+        else:
+            X[:, j] = noise[:, j]
+
+    Cov = np.array([[235.3, 4.7, 35.3, 1.2, 3.6],
+                    [4.7, 0.1, 0.7, 0.0, 0.0],
+                    [35.3, 0.7, 5.3, 0.2, 0.6],
+                    [1.2, 0.0, 0.2, 0.1, 0.3],
+                    [3.6, 0.0, 0.6, 0.3, 1.0]])
+
+    return X, (adjacency_matrix, theta, Cov)

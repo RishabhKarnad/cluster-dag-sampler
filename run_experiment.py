@@ -1,10 +1,6 @@
 import numpy as np
-import jax.numpy as jnp
 import jax.random as random
 from argparse import ArgumentParser
-from pgmpy.models import LinearGaussianBayesianNetwork
-from pgmpy.factors.continuous import LinearGaussianCPD
-import networkx as nx
 import matplotlib.pyplot as plt
 import igraph as ig
 from itertools import chain
@@ -14,7 +10,7 @@ import logging
 import csv
 
 from cdag_mcmc_sampler import CDAGSampler
-from data.continuous import generate_data_continuous_5
+from data.continuous import generate_data_continuous_5, generate_data_continuous_faithful
 from data.discrete import generate_data_discrete_8, generate_data_discrete_4
 from models.gaussian import GaussianDistribution
 # from models.bernoulli import MultivariateBernoulliDistribution
@@ -39,6 +35,8 @@ def make_arg_parser():
     #     '--data', choices=['discrete_4', 'discrete_8', 'continuous_5'])
     parser.add_argument('--score', type=str, choices=['CIC', 'Bayesian'])
 
+    parser.add_argument('--dataset', type=str,
+                        choices=['unfaithful', 'faithful'], default='faithful')
     parser.add_argument('--n_data_samples', type=int)
     parser.add_argument('--n_mcmc_samples', type=int, default=MCMC_N_SAMPLES)
     parser.add_argument('--n_mcmc_warmup', type=int, default=MCMC_N_WARMUP)
@@ -232,26 +230,12 @@ def main(args):
     #     data, (g_true, theta_true) = generate_data_continuous_5(
     #         n_samples=n_samples)
 
-    data, (g_true, theta_true) = generate_data_continuous_5(n_samples=n_samples)
-
-    lgbn = nx.from_numpy_array(
-        g_true, create_using=LinearGaussianBayesianNetwork)
-    G = nx.from_numpy_array(g_true, create_using=nx.MultiDiGraph())
-    obs_noise = 0.1
-    factors = []
-    for node in lgbn.nodes:
-        parents = list(G.predecessors(node))
-        if parents:
-            theta_ = [0.0]
-            theta_ += theta_true[jnp.array(parents), node].tolist()
-            factor = LinearGaussianCPD(node, theta_, obs_noise, parents)
-        else:
-            factor = LinearGaussianCPD(node, [0.0], obs_noise, parents)
-        factors.append(factor)
-
-    lgbn.add_cpds(*factors)
-    joint_dist = lgbn.to_joint_gaussian()
-    Cov_true = joint_dist.covariance
+    if args.dataset == 'faithful':
+        data, (g_true, theta_true, Cov_true) = generate_data_continuous_faithful(
+            n_samples=n_samples)
+    else:
+        data, (g_true, theta_true, Cov_true) = generate_data_continuous_5(
+            n_samples=n_samples)
 
     key_, subk = random.split(key)
 
@@ -279,8 +263,12 @@ def main(args):
     for i, graphs in enumerate(cdag_samples):
         visualize_graphs(graphs[:5], f'{args.output_path}/iter-{i}.png')
 
-    opt_cdag = ([{0, 1, 2}, {3}, {4}],
-                np.array([[0, 1, 0], [0, 0, 1], [0, 0, 0]]))
+    if args.dataset == 'faithful':
+        opt_cdag = ([{1, 3}, {2, 4}, {0}],
+                    np.array([[0, 1, 1], [0, 0, 1], [0, 0, 0]]))
+    else:
+        opt_cdag = ([{0, 1, 2}, {3}, {4}],
+                    np.array([[0, 1, 0], [0, 0, 1], [0, 0, 0]]))
 
     if args.score == 'CIC':
         parameters = {
@@ -291,7 +279,7 @@ def main(args):
             data=data, dist=GaussianDistribution, parameters=parameters)
     elif args.score == 'Bayesian':
         score = BayesianCDAGScore(data=data,
-                                  theta=theta_true,
+                                  theta=theta_true*g_true,
                                   Cov=Cov_true,
                                   min_clusters=args.min_clusters,
                                   mean_clusters=args.max_clusters,
