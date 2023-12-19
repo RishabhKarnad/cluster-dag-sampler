@@ -59,7 +59,7 @@ class ClusterLinearGaussianNetwork:
 
         for _ in tqdm(range(max_mle_iters), 'Estimating theta'):
             l = self.loss(data, params['theta'], Cov, Cs, Gs)
-            cb(l)
+            cb(l.item())
             grads = jax.grad(loss_fn)(params)
             updates, opt_state = optimizer.update(grads, opt_state)
             params = optax.apply_updates(params, updates)
