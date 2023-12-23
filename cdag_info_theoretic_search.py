@@ -110,7 +110,6 @@ def main():
     # from models.bernoulli import MultivariateBernoulliDistribution
     from models.gaussian import GaussianDistribution
     from data.continuous import generate_data_continuous_5
-    from data.discrete import generate_data_discrete_8, generate_data_discrete_4
     import matplotlib.pyplot as plt
 
     # data = generate_data_discrete_v2(n_samples=1000)

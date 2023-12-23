@@ -1,7 +1,10 @@
 #! /bin/bash
 
 DIR=$(date +"%Y-%m-%d-%T")
-mkdir -p results/$DIR/bayesian
+mkdir -p results/$DIR/bayesian/faithful-vstruct
+mkdir -p results/$DIR/bayesian/faithful-novstruct
+mkdir -p results/$DIR/bayesian/nofaithful-vstruct
+mkdir -p results/$DIR/bayesian/nofaithful-novstruct
 # mkdir -p results/$DIR/cic
 
 N_DATA_SAMPLES=1000
@@ -32,8 +35,49 @@ python run_experiment.py \
     --max_mle_iters $MAX_MLE_ITERS \
     --min_clusters $MIN_CLUSTERS \
     --max_clusters $MAX_CLUSTERS \
-    --dataset 'faithful' \
-    --output_path results/$DIR/bayesian
+    --faithful \
+    --vstruct \
+    --output_path results/$DIR/bayesian/faithful-vstruct
+
+python run_experiment.py \
+    --score 'Bayesian' \
+    --n_data_samples $N_DATA_SAMPLES \
+    --n_mcmc_samples $N_MCMC_SAMPLES \
+    --n_mcmc_warmup $N_MCMC_WARMUP \
+    --max_em_iters $MAX_EM_ITERS \
+    --max_mle_iters $MAX_MLE_ITERS \
+    --min_clusters $MIN_CLUSTERS \
+    --max_clusters $MAX_CLUSTERS \
+    --faithful \
+    --no-vstruct \
+    --output_path results/$DIR/bayesian/faithful-novstruct
+
+python run_experiment.py \
+    --score 'Bayesian' \
+    --n_data_samples $N_DATA_SAMPLES \
+    --n_mcmc_samples $N_MCMC_SAMPLES \
+    --n_mcmc_warmup $N_MCMC_WARMUP \
+    --max_em_iters $MAX_EM_ITERS \
+    --max_mle_iters $MAX_MLE_ITERS \
+    --min_clusters $MIN_CLUSTERS \
+    --max_clusters $MAX_CLUSTERS \
+    --no-faithful \
+    --vstruct \
+    --output_path results/$DIR/bayesian/nofaithful-vstruct
+
+python run_experiment.py \
+    --score 'Bayesian' \
+    --n_data_samples $N_DATA_SAMPLES \
+    --n_mcmc_samples $N_MCMC_SAMPLES \
+    --n_mcmc_warmup $N_MCMC_WARMUP \
+    --max_em_iters $MAX_EM_ITERS \
+    --max_mle_iters $MAX_MLE_ITERS \
+    --min_clusters $MIN_CLUSTERS \
+    --max_clusters $MAX_CLUSTERS \
+    --no-faithful \
+    --no-vstruct \
+    --output_path results/$DIR/bayesian/nofaithful-novstruct
+
 
 # python run_experiment.py \
 #     --score 'CIC' \

@@ -1,5 +1,6 @@
 import numpy as np
 import jax.random as random
+import argparse
 from argparse import ArgumentParser
 import matplotlib.pyplot as plt
 import igraph as ig
@@ -10,10 +11,8 @@ import logging
 import csv
 
 from cdag_mcmc_sampler import CDAGSampler
-from data.continuous import generate_data_continuous_5, generate_data_continuous_faithful
-from data.discrete import generate_data_discrete_8, generate_data_discrete_4
+from data.loader import DataGen
 from models.gaussian import GaussianDistribution
-# from models.bernoulli import MultivariateBernoulliDistribution
 from scores.cic_score import ScoreCIC
 from scores.bayesian_cdag_score import BayesianCDAGScore
 from models.cluster_linear_gaussian_network import ClusterLinearGaussianNetwork
@@ -35,8 +34,8 @@ def make_arg_parser():
     #     '--data', choices=['discrete_4', 'discrete_8', 'continuous_5'])
     parser.add_argument('--score', type=str, choices=['CIC', 'Bayesian'])
 
-    parser.add_argument('--dataset', type=str,
-                        choices=['unfaithful', 'faithful'], default='faithful')
+    parser.add_argument('--faithful', action=argparse.BooleanOptionalAction)
+    parser.add_argument('--vstruct', action=argparse.BooleanOptionalAction)
     parser.add_argument('--n_data_samples', type=int)
     parser.add_argument('--n_mcmc_samples', type=int, default=MCMC_N_SAMPLES)
     parser.add_argument('--n_mcmc_warmup', type=int, default=MCMC_N_WARMUP)
@@ -216,26 +215,10 @@ def train(data, init_params, score_type, max_em_iters, n_mcmc_samples, n_mcmc_wa
 def main(args):
     key = random.PRNGKey(args.random_seed)
 
-    # dist = (MultivariateBernoulliDistribution
-    #         if args.data in ['discrete_4', 'discrete_8']
-    #         else GaussianDistribution)
-
     n_samples = args.n_data_samples
 
-    # if args.data == 'discrete_4':
-    #     data, (g_true,) = generate_data_discrete_4(n_samples=n_samples)
-    # elif args.data == 'discrete_8':
-    #     data, (g_true,) = generate_data_discrete_8(n_samples=n_samples)
-    # elif args.data == 'continuous_5':
-    #     data, (g_true, theta_true) = generate_data_continuous_5(
-    #         n_samples=n_samples)
-
-    if args.dataset == 'faithful':
-        data, (g_true, theta_true, Cov_true) = generate_data_continuous_faithful(
-            n_samples=n_samples)
-    else:
-        data, (g_true, theta_true, Cov_true) = generate_data_continuous_5(
-            n_samples=n_samples)
+    data, (g_true, theta_true, Cov_true) = DataGen(key, 0.1).generate_data_continuous_5(
+        n_samples=n_samples, vstruct=args.vstruct, faithful=args.faithful)
 
     key_, subk = random.split(key)
 
@@ -263,12 +246,12 @@ def main(args):
     for i, graphs in enumerate(cdag_samples):
         visualize_graphs(graphs[:5], f'{args.output_path}/iter-{i}.png')
 
-    if args.dataset == 'faithful':
-        opt_cdag = ([{1, 3}, {2, 4}, {0}],
-                    np.array([[0, 1, 1], [0, 0, 1], [0, 0, 0]]))
-    else:
-        opt_cdag = ([{0, 1, 2}, {3}, {4}],
-                    np.array([[0, 1, 0], [0, 0, 1], [0, 0, 0]]))
+    # if args.dataset == 'faithful':
+    opt_cdag = ([{1, 3}, {2, 4}, {0}],
+                np.array([[0, 1, 1], [0, 0, 1], [0, 0, 0]]))
+    # else:
+    #     opt_cdag = ([{0, 1, 2}, {3}, {4}],
+    #                 np.array([[0, 1, 0], [0, 0, 1], [0, 0, 0]]))
 
     if args.score == 'CIC':
         parameters = {
