@@ -23,8 +23,6 @@ class GroupFaithfulDAG:
     def acyclicity(self, mat):
         n_vars = mat.shape[0]
         alpha = 1.0 / n_vars
-        # M = jnp.eye(n_vars) + alpha * mat * mat # [original version]
-        # since mat will be positive real matrix so double multiplication is not required
         M = np.eye(n_vars) + alpha * mat
 
         M_mult = np.linalg.matrix_power(M, n_vars)
@@ -70,7 +68,6 @@ class GroupFaithfulDAG:
 
                 if len(nbrs) >= ord:
                     done = False
-                    # SS = subsets1(nbrs, ord)
                     SS = [set(comb)
                           for comb in itertools.combinations(nbrs, ord)]
                     for S in SS:
@@ -81,7 +78,7 @@ class GroupFaithfulDAG:
             ord = ord + 1
         return indeps
 
-    def hasSameIndepencies(self, H_indeps, W, G):
+    def has_same_indepencies(self, H_indeps, W, G):
         indeps = self.get_group_dag_indeps(G, W)
         return len(indeps) == len(H_indeps), len(indeps)
 
@@ -117,18 +114,10 @@ class GroupFaithfulDAG:
             if self.acyclicity(G_prime) > 0:
                 continue
 
-            flag, length = self.hasSameIndepencies(H_indeps, W, G_prime)
+            flag, length = self.has_same_indepencies(H_indeps, W, G_prime)
             if not flag:
                 continue
 
             G = G_prime
 
         return W, group_dag, G
-
-
-def main():
-    pass
-
-
-if __name__ == '__main__':
-    main()

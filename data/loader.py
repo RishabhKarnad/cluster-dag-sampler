@@ -7,6 +7,7 @@ import jax.numpy as jnp
 from pgmpy.models import LinearGaussianBayesianNetwork
 from pgmpy.factors.continuous import LinearGaussianCPD
 import scipy
+import pandas
 
 
 class DataGen:
@@ -15,8 +16,6 @@ class DataGen:
         self.obs_noise = obs_noise
         self.adjacency_matrix = None
         self.theta = None
-        # self.vstruct=True
-        # self.faithful=False
 
     def generate_data_continuous_5(self, n_samples=100, vstruct=True, faithful=True):
         self.adjacency_matrix = np.zeros((5, 5))
@@ -24,15 +23,14 @@ class DataGen:
         self.faithful = faithful
 
         if not self.vstruct:
-            print('graph no vstruct')
+            print('Graph with no v-struct')
             self.adjacency_matrix[0, 1] = 1
             self.adjacency_matrix[0, 2] = 1
             self.adjacency_matrix[1, 2] = 1
             self.adjacency_matrix[1, 3] = 1
             self.adjacency_matrix[3, 4] = 1
         else:
-            # with vstructure
-            print('graph with vstruct')
+            print('Graph with v-struct')
             self.adjacency_matrix[1, 0] = 1
             self.adjacency_matrix[1, 2] = 1
             self.adjacency_matrix[2, 0] = 1
@@ -47,12 +45,11 @@ class DataGen:
         nvars = len(g.vs)
 
         self.key, subkey = random.split(self.key)
-        # random.normal(subkey,shape=(nvars,nvars))*100
         self.theta = jnp.zeros((nvars, nvars))
 
         if self.vstruct:
             if self.faithful:
-                print('faithful with v structure')
+                print('Faithful with v-structure')
                 self.theta = self.theta.at[1, 0].set(5)
                 self.theta = self.theta.at[2, 0].set(6)
                 self.theta = self.theta.at[0, 3].set(0)
@@ -61,7 +58,7 @@ class DataGen:
                 self.theta = self.theta.at[3, 2].set(2)
                 self.theta = self.theta.at[3, 4].set(3)
             else:
-                print('unfaithful with v structure')
+                print('Unfaithful with v-structure')
                 self.theta = self.theta.at[1, 0].set(1)
                 self.theta = self.theta.at[2, 0].set(1)
                 self.theta = self.theta.at[0, 3].set(0)
@@ -71,7 +68,7 @@ class DataGen:
                 self.theta = self.theta.at[3, 4].set(3)
         else:
             if self.faithful:
-                print('faithful no vstructure')
+                print('Faithful no v-structure')
                 self.theta = self.theta.at[0, 1].set(5)
                 self.theta = self.theta.at[0, 2].set(6)
                 self.theta = self.theta.at[0, 3].set(0)
@@ -80,7 +77,7 @@ class DataGen:
                 self.theta = self.theta.at[1, 3].set(2)
                 self.theta = self.theta.at[3, 4].set(3)
             else:
-                print('unfaithful without v structure')
+                print('Unfaithful without v-structure')
                 self.theta = self.theta.at[0, 1].set(1)
                 self.theta = self.theta.at[0, 2].set(1)
                 self.theta = self.theta.at[0, 3].set(0)
@@ -88,14 +85,6 @@ class DataGen:
                 self.theta = self.theta.at[1, 2].set(-1)
                 self.theta = self.theta.at[1, 3].set(2)
                 self.theta = self.theta.at[3, 4].set(3)
-
-        # self.theta=self.theta.at[0,1].set(3)
-        # self.theta=self.theta.at[0,2].set(-6)
-        # self.theta=self.theta.at[0,3].set(0)
-        # self.theta=self.theta.at[2,3].set(0)
-        # self.theta=self.theta.at[1,2].set(2)
-        # self.theta=self.theta.at[1,3].set(4)
-        # self.theta=self.theta.at[3,4].set(5)
 
         noise = np.sqrt(self.obs_noise) * \
             np.random.normal(size=(n_samples, nvars))
@@ -132,16 +121,9 @@ class DataGen:
         nvars = len(g.vs)
 
         self.key, subkey = random.split(self.key)
-        # self.theta=random.normal(subkey,shape=(nvars,nvars))*1
-        # self.theta=self.theta.at[0,1].set(1)
-        # self.theta=self.theta.at[0,2].set(1)
-        # self.theta=self.theta.at[1,2].set(-1)
-        # self.theta=np.array([[0,1,1],[1,0,-1],[1,-1,0]])
-        # self.theta=np.array([[0,1,1],[1,0,2],[1/2,1/2,0]])
         self.theta = theta
         self.Cov = Cov
 
-        # noise = np.sqrt(self.obs_noise)*np.random.normal(size=(n_samples, nvars))
         n1 = np.sqrt(Cov[0, 0])*np.random.normal(size=(n_samples, 1))
         n2 = np.sqrt(Cov[1, 1])*np.random.normal(size=(n_samples, 1))
         n3 = np.sqrt(Cov[2, 2])*np.random.normal(size=(n_samples, 1))
@@ -164,6 +146,27 @@ class DataGen:
                 X = X.at[:, j].set(noise[:, j])
 
         return X, self.theta
+
+    def load_sachs_data(self):
+        data = pandas.read_csv('sachs.data.txt', delimiter='\t').to_numpy()
+
+        true_graph = np.zeros((11, 11))
+
+        true_theta = np.zeros((11, 11))
+        true_cov = np.zeros((11, 11))
+
+        return data, (true_graph, true_theta, true_cov)
+
+    def load_housing_data(self):
+        data = pandas.read_csv(
+            'housing.csv', delim_whitespace=True, header=None).to_numpy()
+
+        true_graph = np.zeros((14, 14))
+
+        true_theta = np.zeros((14, 14))
+        true_cov = np.zeros((14, 14))
+
+        return data, (true_graph, true_theta, true_cov)
 
     def obtain_truecluster(self):
         """Define cluster"""
@@ -216,8 +219,6 @@ class DataGen:
         G_LBN.add_cpds(*factors)
         joint_dist = G_LBN.to_joint_gaussian()
         Cov_true = joint_dist.covariance
-        # print(joint_dist.mean)
-        # print(Cov_true)
         return Cov_true
 
     def compute_jointcov(self):
@@ -245,8 +246,6 @@ class DataGen:
         G_LBN.add_cpds(*factors)
         joint_dist = G_LBN.to_joint_gaussian()
         Cov_true = joint_dist.covariance
-        # print(joint_dist.mean)
-        # print(Cov_true)
         return Cov_true
 
     def compute_noisycov(self, C):
@@ -258,6 +257,4 @@ class DataGen:
         Cov_mask_true = G_cov*Cov_true
         Cov_noise = scipy.stats.wishart.rvs(nvars, 100, size=(5, 5))
         Cov_mask_true_noise = Cov_mask_true+G_anticov*Cov_noise
-        # print(Cov_mask_true)
-        # print(Cov_mask_true_noise)
         return Cov_mask_true_noise, Cov_mask_true
