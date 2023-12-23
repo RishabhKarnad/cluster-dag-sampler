@@ -159,7 +159,7 @@ class DataGen:
 
     def load_housing_data(self):
         data = pandas.read_csv(
-            'housing.csv', delim_whitespace=True, header=None).to_numpy()
+            'housing.csv', delim_whitespace=True).to_numpy()
 
         true_graph = np.zeros((14, 14))
 
