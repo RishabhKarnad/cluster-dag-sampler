@@ -8,6 +8,9 @@ from pgmpy.models import LinearGaussianBayesianNetwork
 from pgmpy.factors.continuous import LinearGaussianCPD
 import scipy
 import pandas
+import cdt.data
+
+from data.group_faithful import GroupFaithfulDAG
 
 
 class DataGen:
@@ -148,14 +151,11 @@ class DataGen:
         return X, self.theta
 
     def load_sachs_data(self):
-        data = pandas.read_csv('sachs.data.txt', delimiter='\t').to_numpy()
+        data, true_graph = cdt.data.load_dataset('sachs')
 
-        true_graph = np.zeros((11, 11))
+        true_graph = nx.adjacency_matrix(true_graph).todense()
 
-        true_theta = np.zeros((11, 11))
-        true_cov = np.zeros((11, 11))
-
-        return data, (true_graph, true_theta, true_cov)
+        return data, (true_graph,)
 
     def load_housing_data(self):
         data = pandas.read_csv(
@@ -167,6 +167,39 @@ class DataGen:
         true_cov = np.zeros((14, 14))
 
         return data, (true_graph, true_theta, true_cov)
+
+    def generate_data_group_faithful(self, *, n_samples=100, N, k, p, var_parms=10):
+        grouping, group_dag, dag = GroupFaithfulDAG().gen_group_faithful_dag(N, k, p)
+
+        G = nx.from_numpy_array(dag,
+                                create_using=nx.MultiDiGraph())
+        g = ig.Graph.from_networkx(G)
+        g.vs['label'] = g.vs['_nx_name']
+
+        toporder = g.topological_sorting()
+
+        noise = np.sqrt(self.obs_noise) * \
+            np.random.normal(size=(n_samples, N))
+
+        theta = np.random.rand(N, N) * var_parms
+
+        X = jnp.zeros((n_samples, N))
+
+        for j in toporder:
+            parent_edges = g.incident(j, mode='in')
+            parents = list(g.es[e].source for e in parent_edges)
+
+            if parents:
+                mean = X[:, jnp.array(
+                    parents)] @ theta[jnp.array(parents), j]
+                X = X.at[:, j].set(mean + noise[:, j])
+
+            else:
+                X = X.at[:, j].set(noise[:, j])
+
+        cov = np.zeros((N, N))
+
+        return X, (dag, theta, cov, grouping, group_dag)
 
     def obtain_truecluster(self):
         """Define cluster"""
