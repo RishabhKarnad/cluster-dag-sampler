@@ -228,58 +228,64 @@ class DataGen:
             nx.draw_circular(G, with_labels=True)
 
     def compute_fullcov(self):
-        G = nx.from_numpy_array(self.adjacency_matrix,
-                                create_using=nx.MultiDiGraph())
-        G_LBN = nx.from_numpy_array(
-            self.adjacency_matrix, create_using=LinearGaussianBayesianNetwork)
+        # G = nx.from_numpy_array(self.adjacency_matrix,
+        #                         create_using=nx.MultiDiGraph())
+        # G_LBN = nx.from_numpy_array(
+        #     self.adjacency_matrix, create_using=LinearGaussianBayesianNetwork)
 
-        factors = []
-        for node in G_LBN.nodes:
-            print(node)
-            parents = list(G.predecessors(node))
-            if parents:
-                theta_ = [0.0]
-                theta_ += self.theta[jnp.array(parents), node].tolist()
-                print(theta_)
-                factor = LinearGaussianCPD(
-                    node, theta_, self.obs_noise, parents)
-            else:
-                print('here')
-                factor = LinearGaussianCPD(
-                    node, [0.0], self.obs_noise, parents)
-            factors.append(factor)
+        # factors = []
+        # for node in G_LBN.nodes:
+        #     print(node)
+        #     parents = list(G.predecessors(node))
+        #     if parents:
+        #         theta_ = [0.0]
+        #         theta_ += self.theta[jnp.array(parents), node].tolist()
+        #         print(theta_)
+        #         factor = LinearGaussianCPD(
+        #             node, theta_, self.obs_noise, parents)
+        #     else:
+        #         print('here')
+        #         factor = LinearGaussianCPD(
+        #             node, [0.0], self.obs_noise, parents)
+        #     factors.append(factor)
 
-        G_LBN.add_cpds(*factors)
-        joint_dist = G_LBN.to_joint_gaussian()
-        Cov_true = joint_dist.covariance
-        return Cov_true
+        # G_LBN.add_cpds(*factors)
+        # joint_dist = G_LBN.to_joint_gaussian()
+        # Cov_true = joint_dist.covariance
+        # return Cov_true
 
-    def compute_jointcov(self):
-        G = nx.from_numpy_array(self.adjacency_matrix,
-                                create_using=nx.MultiDiGraph())
-        G_LBN = nx.from_numpy_array(
-            self.adjacency_matrix, create_using=LinearGaussianBayesianNetwork)
+        n_vars = self.theta.shape[0]
+        lambda_ = np.linalg.inv(np.eye(n_vars) - self.theta)
+        D = self.obs_noise * np.eye(n_vars)
+        Cov = lambda_.T@D@lambda_
+        return Cov
 
-        factors = []
-        for node in G_LBN.nodes:
-            print(node)
-            parents = list(G.predecessors(node))
-            if parents:
-                theta_ = [0.0]
-                theta_ += self.theta[jnp.array(parents), node].tolist()
-                print(theta_)
-                factor = LinearGaussianCPD(
-                    node, theta_, self.Cov[node, node], parents)
-            else:
-                print('here')
-                factor = LinearGaussianCPD(
-                    node, [0.0], self.Cov[node, node], parents)
-            factors.append(factor)
+    # def compute_jointcov(self):
+    #     G = nx.from_numpy_array(self.adjacency_matrix,
+    #                             create_using=nx.MultiDiGraph())
+    #     G_LBN = nx.from_numpy_array(
+    #         self.adjacency_matrix, create_using=LinearGaussianBayesianNetwork)
 
-        G_LBN.add_cpds(*factors)
-        joint_dist = G_LBN.to_joint_gaussian()
-        Cov_true = joint_dist.covariance
-        return Cov_true
+    #     factors = []
+    #     for node in G_LBN.nodes:
+    #         print(node)
+    #         parents = list(G.predecessors(node))
+    #         if parents:
+    #             theta_ = [0.0]
+    #             theta_ += self.theta[jnp.array(parents), node].tolist()
+    #             print(theta_)
+    #             factor = LinearGaussianCPD(
+    #                 node, theta_, self.Cov[node, node], parents)
+    #         else:
+    #             print('here')
+    #             factor = LinearGaussianCPD(
+    #                 node, [0.0], self.Cov[node, node], parents)
+    #         factors.append(factor)
+
+    #     G_LBN.add_cpds(*factors)
+    #     joint_dist = G_LBN.to_joint_gaussian()
+    #     Cov_true = joint_dist.covariance
+    #     return Cov_true
 
     def compute_noisycov(self, C):
         # C:nvarsXnclus
