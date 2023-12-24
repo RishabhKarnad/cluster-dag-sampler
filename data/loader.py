@@ -168,7 +168,7 @@ class DataGen:
 
         return data, (true_graph, true_theta, true_cov)
 
-    def generate_data_group_faithful(self, *, n_samples=100, N, k, p, var_parms=10):
+    def generate_data_group_faithful(self, *, n_samples=100, N, k, p, var_params=10):
         grouping, group_dag, dag = GroupFaithfulDAG().gen_group_faithful_dag(N, k, p)
 
         G = nx.from_numpy_array(dag,
@@ -181,7 +181,7 @@ class DataGen:
         noise = np.sqrt(self.obs_noise) * \
             np.random.normal(size=(n_samples, N))
 
-        theta = np.random.rand(N, N) * var_parms
+        self.theta = np.random.rand(N, N) * var_params
 
         X = jnp.zeros((n_samples, N))
 
@@ -191,15 +191,13 @@ class DataGen:
 
             if parents:
                 mean = X[:, jnp.array(
-                    parents)] @ theta[jnp.array(parents), j]
+                    parents)] @ self.theta[jnp.array(parents), j]
                 X = X.at[:, j].set(mean + noise[:, j])
 
             else:
                 X = X.at[:, j].set(noise[:, j])
 
-        cov = np.zeros((N, N))
-
-        return X, (dag, theta, cov, grouping, group_dag)
+        return X, (dag, self.theta, self.compute_fullcov(), grouping, group_dag)
 
     def obtain_truecluster(self):
         """Define cluster"""
