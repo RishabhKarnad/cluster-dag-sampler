@@ -2,8 +2,8 @@ import networkx as nx
 import numpy as np
 import random
 import itertools
+import scipy.stats as stats
 
-from generate_graphs import generate_graph
 
 random.seed(42)
 
@@ -78,10 +78,21 @@ class GroupFaithfulDAG:
         indeps = self.get_group_dag_indeps(G, W)
         return len(indeps) == len(H_indeps), len(indeps)
 
+    def generate_graph(self, n, p):
+        graph = np.zeros((n, n))
+
+        B = stats.bernoulli(p)
+
+        for i in range(n):
+            for j in range(i+1, n):
+                graph[i, j] = B.rvs()
+
+        return graph
+
     def gen_group_faithful_dag(self, N=10, k=3, p=0.2):
         n = int(np.ceil(N / k))
 
-        group_dag = generate_graph(n, p)
+        group_dag = self.generate_graph(n, p)
 
         W = list(map(set, np.array_split(np.random.permutation(N), n)))
 
