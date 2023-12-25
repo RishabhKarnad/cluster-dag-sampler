@@ -32,6 +32,11 @@ class DataGen:
             self.adjacency_matrix[1, 2] = 1
             self.adjacency_matrix[1, 3] = 1
             self.adjacency_matrix[3, 4] = 1
+
+            grouping = [{0, 1, 2}, {3}, {4}]
+            group_dag = np.array([[0, 1, 0],
+                                  [0, 0, 1],
+                                  [0, 0, 0]])
         else:
             print('Graph with v-struct')
             self.adjacency_matrix[1, 0] = 1
@@ -39,6 +44,11 @@ class DataGen:
             self.adjacency_matrix[2, 0] = 1
             self.adjacency_matrix[3, 2] = 1
             self.adjacency_matrix[3, 4] = 1
+
+            grouping = [{1, 3}, {2}, {0, 4}]
+            group_dag = np.array([[0, 1, 1],
+                                  [0, 0, 1],
+                                  [0, 0, 0]])
 
         G = nx.from_numpy_array(self.adjacency_matrix,
                                 create_using=nx.MultiDiGraph())
@@ -108,7 +118,7 @@ class DataGen:
             else:
                 X = X.at[:, j].set(noise[:, j])
 
-        return X, (self.adjacency_matrix, self.theta, self.compute_fullcov())
+        return X, (self.adjacency_matrix, self.theta, self.compute_fullcov(), grouping, group_dag)
 
     def generate_data_continuous_3(self, theta, Cov, n_samples=100):
         self.adjacency_matrix = np.zeros((3, 3))
