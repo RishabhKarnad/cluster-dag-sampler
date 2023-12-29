@@ -43,14 +43,13 @@ class CDAGJointDistribution:
     def logpmf(self, C, G, X):
         k = len(C)
         C = to_matrix(C, len(C))
-        # return (TruncatedPoisson(self.min_clusters, self.mean_clusters, self.max_clusters).logpmf(k)
-        #         + self.cluster_prior(self.n_vars, k).logpmf(C)
-        #         + self.graph_prior(self.n_vars).logpmf(G)
-        #         + self.likelihood(self.n_vars).logpmf(X, self.theta, self.Cov, C, G))
-        return (stats.randint(self.min_clusters, self.max_clusters+1).logpmf(k)
-                + self.cluster_prior(self.n_vars, k).logpmf(C)
-                + self.graph_prior(self.n_vars).logpmf(G)
-                + self.likelihood(self.n_vars).logpmf(X, self.theta, self.Cov, C, G))
+        p_k = stats.randint(self.min_clusters, self.max_clusters+1).logpmf(k)
+        p_c = self.cluster_prior(self.n_vars, k).logpmf(C)
+        p_g = self.graph_prior(self.n_vars).logpmf(G)
+        p_d = self.likelihood(self.n_vars).logpmf(
+            X, self.theta, self.Cov, C, G)
+
+        return p_k + p_c + p_g + p_d
 
     def sample(self):
         raise NotImplementedError

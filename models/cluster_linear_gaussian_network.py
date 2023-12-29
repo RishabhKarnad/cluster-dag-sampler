@@ -69,14 +69,14 @@ class ClusterLinearGaussianNetwork:
         self.cdag_scores = scores
 
     def loss(self, X, theta, Cov, Cs, Gs):
-        return -jnp.sum(jax.vmap(self.logpmf, (None, None, None, 0, 0), 0)(X, theta, Cov, Cs, Gs))
+        return -jnp.mean(jax.vmap(self.logpmf, (None, None, None, 0, 0), 0)(X, theta, Cov, Cs, Gs))
 
     def logpmf(self, X, theta, Cov, C, G):
         G_expand = C@G@C.T
         mean_expected = X@(G_expand*theta)
         G_cov = C@C.T
         Cov_mask = G_cov*Cov
-        return jnp.sum(stats.multivariate_normal.logpdf(X, mean_expected, Cov_mask))
+        return jnp.mean(stats.multivariate_normal.logpdf(X, mean_expected, Cov_mask))
 
     def pmf(self, X, theta, Cov, C, G):
         return jnp.exp(self.logpmf(X, theta, Cov, C, G))

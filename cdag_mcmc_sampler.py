@@ -245,9 +245,10 @@ class CDAGSampler:
             V = [sorted(K_i) for K_i in K]
             G_C = (V, E)
             graph_score = self.graph_score(G_C)
-            score += graph_score
+            score += np.exp(graph_score)
             graphs.append(E)
             graph_scores.append(graph_score)
+        score = np.log(score)
         return score, graphs, graph_scores
 
     def sample_graphs(self, K, *, n_samples=None):
