@@ -34,6 +34,8 @@ def make_arg_parser():
     #     '--data', choices=['discrete_4', 'discrete_8', 'continuous_5'])
     parser.add_argument('--score', type=str, choices=['CIC', 'Bayesian'])
 
+    parser.add_argument('--group_faithful',
+                        action=argparse.BooleanOptionalAction)
     parser.add_argument('--faithful', action=argparse.BooleanOptionalAction)
     parser.add_argument('--vstruct', action=argparse.BooleanOptionalAction)
     parser.add_argument('--n_data_samples', type=int)
@@ -217,8 +219,28 @@ def main(args):
 
     n_samples = args.n_data_samples
 
-    data, (g_true, theta_true, Cov_true) = DataGen(key, 0.1).generate_data_continuous_5(
-        n_samples=n_samples, vstruct=args.vstruct, faithful=args.faithful)
+    if args.group_faithful:
+        data, (g_true, theta_true, Cov_true, grouping, group_dag) = DataGen(
+            key, 0.1).generate_data_group_faithful(n_samples=n_samples, N=10, k=3, p=0.2)
+    else:
+        data, (g_true, theta_true, Cov_true, grouping, group_dag) = DataGen(key, 0.1).generate_data_continuous_5(
+            n_samples=n_samples, vstruct=args.vstruct, faithful=args.faithful)
+
+    logging.info('GROUND TRUTH')
+    logging.info(
+        '============================================================')
+    logging.info('True graph')
+    logging.info(g_true)
+    logging.info('Grouping')
+    logging.info(grouping)
+    logging.info('Group DAG')
+    logging.info(group_dag)
+    logging.info('True theta')
+    logging.info(theta_true)
+    logging.info('True covariance')
+    logging.info(Cov_true)
+    logging.info(
+        '============================================================')
 
     key_, subk = random.split(key)
 
@@ -246,13 +268,6 @@ def main(args):
     for i, graphs in enumerate(cdag_samples):
         visualize_graphs(graphs[:5], f'{args.output_path}/iter-{i}.png')
 
-    # if args.dataset == 'faithful':
-    opt_cdag = ([{1, 3}, {2, 4}, {0}],
-                np.array([[0, 1, 1], [0, 0, 1], [0, 0, 0]]))
-    # else:
-    #     opt_cdag = ([{0, 1, 2}, {3}, {4}],
-    #                 np.array([[0, 1, 0], [0, 0, 1], [0, 0, 0]]))
-
     if args.score == 'CIC':
         parameters = {
             'mean': np.array((data@theta_true).mean(axis=0)),
@@ -268,12 +283,11 @@ def main(args):
                                   mean_clusters=args.max_clusters,
                                   max_clusters=args.max_clusters)
 
+    opt_cdag = (grouping, group_dag)
     opt_score = score(opt_cdag)
 
     plot_graph_scores(cdag_scores, opt_score, args.output_path)
 
-    logging.info('True theta')
-    logging.info(theta_true)
     logging.info('Estimated theta')
     logging.info(theta)
 
