@@ -30,6 +30,15 @@ def unstringify_cdag(cdag_string):
     return C, E_C
 
 
+def clustering_to_matrix(C, k):
+    n = np.sum([len(C_i) for C_i in C])
+    m = np.zeros((n, k))
+    for i, C_i in enumerate(C):
+        for X_j in C_i:
+            m[X_j, i] = 1
+    return m
+
+
 def test():
     cdag = ([{1, 4, 3}, {5, 2}, {0, 14}], np.array(
         [[0,  0, 0], [0, 0, 1], [0, 0, 0]]))

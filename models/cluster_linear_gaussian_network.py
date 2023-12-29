@@ -5,14 +5,7 @@ from jax.scipy import stats
 import optax
 from tqdm import tqdm
 
-
-def to_matrix(C, k):
-    n = np.sum([len(C_i) for C_i in C])
-    m = np.zeros((n, k))
-    for i, C_i in enumerate(C):
-        for X_j in C_i:
-            m[X_j, i] = 1
-    return m
+from utils.c_dag import clustering_to_matrix
 
 
 def zero_pad(A, k):
@@ -46,7 +39,7 @@ class ClusterLinearGaussianNetwork:
         k_max = jnp.max(ks).item()
 
         Cs = jnp.array(
-            list(map(lambda G_C: (to_matrix(G_C[0], k=k_max)), samples)))
+            list(map(lambda G_C: (clustering_to_matrix(G_C[0], k=k_max)), samples)))
 
         Gs = jnp.array(
             list(map(lambda G_C: (zero_pad(G_C[1], k=k_max)), samples)))

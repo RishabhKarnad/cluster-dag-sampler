@@ -39,7 +39,9 @@
                 "--min_clusters",
                 "3",
                 "--max_clusters",
-                "4",
+                "3",
+                "--faithful",
+                "--vstruct",
                 "--output_path",
                 "./results/debug"
             ]

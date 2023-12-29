@@ -5,15 +5,7 @@ from models.truncated_poisson import TruncatedPoisson
 from models.clustering_distribution import ClusteringDistribution
 from models.graph_distribution import SparseDAGDistribution
 from models.cluster_linear_gaussian_network import ClusterLinearGaussianNetwork
-
-
-def to_matrix(C, k):
-    n = np.sum([len(C_i) for C_i in C])
-    m = np.zeros((n, k))
-    for i, C_i in enumerate(C):
-        for X_j in C_i:
-            m[X_j, i] = 1
-    return m
+from utils.c_dag import clustering_to_matrix
 
 
 class CDAGJointDistribution:
@@ -42,7 +34,7 @@ class CDAGJointDistribution:
 
     def logpmf(self, C, G, X):
         k = len(C)
-        C = to_matrix(C, len(C))
+        C = clustering_to_matrix(C, len(C))
         p_k = stats.randint(self.min_clusters, self.max_clusters+1).logpmf(k)
         p_c = self.cluster_prior(self.n_vars, k).logpmf(C)
         p_g = self.graph_prior(self.n_vars).logpmf(G)

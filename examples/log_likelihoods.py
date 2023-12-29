@@ -5,6 +5,7 @@ from tqdm import tqdm
 
 from data.continuous import generate_data_continuous_5
 from models.cluster_linear_gaussian_network import ClusterLinearGaussianNetwork
+from utils.c_dag import clustering_to_matrix
 
 
 def all_partitionings(l):
@@ -42,17 +43,8 @@ def generate_graphs():
     return c_dags
 
 
-def to_matrix(C, k):
-    n = np.sum([len(C_i) for C_i in C])
-    m = np.zeros((n, k))
-    for i, C_i in enumerate(C):
-        for X_j in C_i:
-            m[X_j, i] = 1
-    return m
-
-
 def compute_nll(data, theta, Cov, C, G):
-    C = to_matrix(C, 3)
+    C = clustering_to_matrix(C, 3)
     return -ClusterLinearGaussianNetwork(5).logpmf(data, theta, Cov, C, G)
 
 

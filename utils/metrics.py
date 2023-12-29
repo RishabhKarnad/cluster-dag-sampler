@@ -3,6 +3,9 @@ import numpy as np
 from cdt.metrics import SHD
 import networkx as nx
 
+from data.group_faithful import GroupFaithfulDAG
+from utils.c_dag import clustering_to_matrix
+
 # def shd_agn(B_true, B_est):
 #     pred = np.flatnonzero(B_est == 1)
 #     cond = np.flatnonzero(B_true)
@@ -77,6 +80,37 @@ def cluster_shd(g_true, g_c):
 
 def expected_cluster_shd(g_true, graphs):
     return np.sum([cluster_shd(g_true, g_c) for g_c in graphs]) / len(graphs)
+
+
+def shd_expanded_graph(cdag, theta, true_dag):
+    C, G_C = cdag
+    C = clustering_to_matrix(C, k=len(C))
+    theta = np.where(theta > 0.5, 1, 0)
+    G_expand = C@G_C@C.T
+    G = G_expand*theta
+
+    true_dag = true_dag*G_expand
+
+    return SHD(G, true_dag)
+
+
+def expected_shd(cdags, theta, true_dag):
+    return np.mean([shd_expanded_graph(cdag, theta, true_dag) for cdag in cdags])
+
+
+def faithfulness_score(samples, g_true):
+    group_faithful_model = GroupFaithfulDAG()
+    count = 0
+    for groups, group_dag in samples:
+        group_names = list(map(lambda x: {x}, np.arange(group_dag.shape[0])))
+        H_indeps = group_faithful_model.get_group_dag_indeps(
+            group_dag, group_names)
+        isFaithful, _ = group_faithful_model.has_same_indepencies(
+            H_indeps, groups, g_true)
+        if isFaithful:
+            count += 1
+
+    return count / len(samples)
 
 
 def test():

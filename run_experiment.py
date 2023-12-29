@@ -16,7 +16,7 @@ from models.gaussian import GaussianDistribution
 from scores.cic_score import ScoreCIC
 from scores.bayesian_cdag_score import BayesianCDAGScore
 from models.cluster_linear_gaussian_network import ClusterLinearGaussianNetwork
-from utils.metrics import expected_cluster_shd
+from utils.metrics import expected_cluster_shd, expected_shd, faithfulness_score
 from utils.c_dag import stringify_cdag, unstringify_cdag
 
 
@@ -63,7 +63,7 @@ def initialize_logger(output_path=None):
         filename=log_filename, encoding='utf-8', filemode='w', level=logging.INFO)
 
 
-def evaluate_samples(samples, scores, g_true):
+def evaluate_samples(samples, scores, g_true, theta):
     for i, sample in enumerate(samples):
         logging.info(f'[Sample {i}]')
         C, G = sample
@@ -76,6 +76,12 @@ def evaluate_samples(samples, scores, g_true):
 
     ecshd = expected_cluster_shd(g_true, samples)
     logging.info(f'E-CSHD: {ecshd}')
+
+    eshd = expected_shd(samples, theta, g_true)
+    logging.info(f'E-SHD: {eshd}')
+
+    faithfulness = faithfulness_score(samples, g_true)
+    logging.info(f'Faithfulness score: {faithfulness}')
 
 
 def display_sample_statistics(samples, filepath):
@@ -128,7 +134,7 @@ def visualize_graphs(graphs, filename):
     for ni in range(nrows):
         for nj in range(ncols):
             ax[ni, nj].axis('off')
-    for graph in graphs:
+    for graph in graphs[:5]:
         plot_graph(graph, ax[i, j])
         if j+1 == ncols:
             j = 0
@@ -262,11 +268,11 @@ def main(args):
                                                          args.max_clusters)
 
     evaluate_samples(samples=cdag_samples[-1],
-                     scores=cdag_scores[-1], g_true=g_true)
+                     scores=cdag_scores[-1], g_true=g_true, theta=theta)
     display_sample_statistics(cdag_samples[-1], filepath=args.output_path)
 
     for i, graphs in enumerate(cdag_samples):
-        visualize_graphs(graphs[:5], f'{args.output_path}/iter-{i}.png')
+        visualize_graphs(graphs, f'{args.output_path}/iter-{i}.png')
 
     if args.score == 'CIC':
         parameters = {
