@@ -124,8 +124,10 @@ def visualize_graphs(graphs, filename):
     logging.info(graph_info[:5])
     graphs = [unstringify_cdag(g) for g in graphs]
 
+    selected_graphs = graphs[:5]
+
     ncols = 2
-    nrows = int(np.ceil(len(graphs) / 2))
+    nrows = int(np.ceil(len(selected_graphs) / 2))
 
     px = 1/plt.rcParams['figure.dpi']  # pixel in inches
     fig, ax = plt.subplots(nrows, ncols, figsize=(ncols*350*px, nrows*350*px))
@@ -134,7 +136,7 @@ def visualize_graphs(graphs, filename):
     for ni in range(nrows):
         for nj in range(ncols):
             ax[ni, nj].axis('off')
-    for graph in graphs[:5]:
+    for graph in selected_graphs:
         plot_graph(graph, ax[i, j])
         if j+1 == ncols:
             j = 0
