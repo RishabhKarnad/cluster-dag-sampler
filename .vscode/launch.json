@@ -40,6 +40,8 @@
                 "3",
                 "--max_clusters",
                 "3",
+                "--num_chains",
+                "1",
                 "--faithful",
                 "--vstruct",
                 "--output_path",

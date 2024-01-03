@@ -14,6 +14,7 @@ MAX_EM_ITERS=5
 MAX_MLE_ITERS=1000
 MIN_CLUSTERS=3
 MAX_CLUSTERS=3
+NUM_CHAINS=4
 
 python run_experiment.py \
     --score 'Bayesian' \
@@ -24,6 +25,7 @@ python run_experiment.py \
     --max_mle_iters $MAX_MLE_ITERS \
     --min_clusters $MIN_CLUSTERS \
     --max_clusters $MAX_CLUSTERS \
+    --num_chains $NUM_CHAINS \
     --faithful \
     --vstruct \
     --output_path results/$DIR/bayesian/faithful-vstruct
@@ -37,6 +39,7 @@ python run_experiment.py \
     --max_mle_iters $MAX_MLE_ITERS \
     --min_clusters $MIN_CLUSTERS \
     --max_clusters $MAX_CLUSTERS \
+    --num_chains $NUM_CHAINS \
     --faithful \
     --no-vstruct \
     --output_path results/$DIR/bayesian/faithful-novstruct
@@ -50,6 +53,7 @@ python run_experiment.py \
     --max_mle_iters $MAX_MLE_ITERS \
     --min_clusters $MIN_CLUSTERS \
     --max_clusters $MAX_CLUSTERS \
+    --num_chains $NUM_CHAINS \
     --no-faithful \
     --vstruct \
     --output_path results/$DIR/bayesian/nofaithful-vstruct
@@ -63,6 +67,7 @@ python run_experiment.py \
     --max_mle_iters $MAX_MLE_ITERS \
     --min_clusters $MIN_CLUSTERS \
     --max_clusters $MAX_CLUSTERS \
+    --num_chains $NUM_CHAINS \
     --no-faithful \
     --no-vstruct \
     --output_path results/$DIR/bayesian/nofaithful-novstruct
@@ -76,5 +81,6 @@ python run_experiment.py \
     --max_mle_iters $MAX_MLE_ITERS \
     --min_clusters 4 \
     --max_clusters 4 \
+    --num_chains $NUM_CHAINS \
     --group_faithful \
     --output_path results/$DIR/bayesian/group-faithful

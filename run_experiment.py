@@ -16,8 +16,8 @@ from models.gaussian import GaussianDistribution
 from scores.cic_score import ScoreCIC
 from scores.bayesian_cdag_score import BayesianCDAGScore
 from models.cluster_linear_gaussian_network import ClusterLinearGaussianNetwork
-from utils.metrics import expected_cluster_shd, expected_shd, faithfulness_score
-from utils.c_dag import stringify_cdag, unstringify_cdag
+from utils.metrics import expected_cluster_shd, expected_shd, expected_metrics, faithfulness_score, compute_nlls
+from utils.c_dag import stringify_cdag, unstringify_cdag, clustering_to_matrix
 
 
 MCMC_N_WARMUP = 100
@@ -42,6 +42,8 @@ def make_arg_parser():
     parser.add_argument('--n_mcmc_samples', type=int, default=MCMC_N_SAMPLES)
     parser.add_argument('--n_mcmc_warmup', type=int, default=MCMC_N_WARMUP)
 
+    parser.add_argument('--num_chains', type=int, default=1)
+
     parser.add_argument('--max_em_iters', type=int, default=10)
     parser.add_argument('--max_mle_iters', type=int, default=100)
     parser.add_argument('--min_clusters', type=int, default=None)
@@ -63,7 +65,7 @@ def initialize_logger(output_path=None):
         filename=log_filename, encoding='utf-8', filemode='w', level=logging.INFO)
 
 
-def evaluate_samples(samples, scores, g_true, theta):
+def evaluate_samples(samples, scores, g_true, theta, Cov, data):
     for i, sample in enumerate(samples):
         logging.info(f'[Sample {i}]')
         C, G = sample
@@ -74,11 +76,19 @@ def evaluate_samples(samples, scores, g_true, theta):
         logging.info(f'    graph_score: {score_CIC}')
     logging.info('=========================')
 
-    ecshd = expected_cluster_shd(g_true, samples)
-    logging.info(f'E-CSHD: {ecshd}')
+    ecshd, ecshd_stddev = expected_cluster_shd(g_true, samples)
+    logging.info(f'E-CSHD: {ecshd}+-{ecshd_stddev}')
 
-    eshd = expected_shd(samples, theta, g_true)
-    logging.info(f'E-SHD: {eshd}')
+    eshd, eshd_stddev = expected_shd(samples, theta, g_true)
+    logging.info(f'E-SHD: {eshd}+-{eshd_stddev}')
+
+    eshd_vcn, eshd_stddev_vcn, prc, rec = expected_metrics(
+        samples, theta, g_true)
+    logging.info(
+        f'E-SHD (VCN): {eshd_vcn}+-{eshd_stddev_vcn}, E-PRC: {prc}, E-REC: {rec}')
+
+    nll_mean, nll_stddev = compute_nlls(data, samples, theta, Cov)
+    logging.info(f'NLL: {nll_mean}+-{nll_stddev}')
 
     faithfulness = faithfulness_score(samples, g_true)
     logging.info(f'Faithfulness score: {faithfulness}')
@@ -153,9 +163,9 @@ def plot_graph_scores(scores, opt_score, filepath):
     scores = list(chain(*scores))
     scores = list(map(lambda x: x[1].item(), scores))
     plt.plot(scores)
-    for l in lengths:
-        plt.axvline(l, color='green')
-    plt.axhline(opt_score, color='red')
+    for i, l in enumerate(lengths):
+        plt.axvline(l*(i+1), color='green')
+    plt.axhline(opt_score, color='red', linestyle=':')
     plt.savefig(f'{filepath}/scores.png')
     plt.clf()
 
@@ -234,6 +244,8 @@ def main(args):
         data, (g_true, theta_true, Cov_true, grouping, group_dag) = DataGen(key, 0.1).generate_data_continuous_5(
             n_samples=n_samples, vstruct=args.vstruct, faithful=args.faithful)
 
+    m, n = data.shape
+
     logging.info('GROUND TRUTH')
     logging.info(
         '============================================================')
@@ -247,65 +259,83 @@ def main(args):
     logging.info(theta_true)
     logging.info('True covariance')
     logging.info(Cov_true)
+    logging.info('Ground truth NLL')
+    logging.info(-ClusterLinearGaussianNetwork(n).logpmf(data,
+                 theta_true, Cov_true, clustering_to_matrix(grouping, len(grouping)), group_dag))
     logging.info(
         '============================================================')
 
     key_, subk = random.split(key)
 
-    m, n = data.shape
-    theta = random.normal(subk, (n, n))
+    base_path = args.output_path
 
-    init_params = {
-        'theta': theta,
-        'Cov': Cov_true,
-    }
+    for i in range(args.num_chains):
+        chain_id = i + 1
 
-    cdag_samples, cdag_scores, theta, loss_trace = train(data,
-                                                         init_params,
-                                                         args.score,
-                                                         args.max_em_iters,
-                                                         args.n_mcmc_samples,
-                                                         args.n_mcmc_warmup,
-                                                         args.min_clusters,
-                                                         args.max_clusters)
+        args.output_path = f'{base_path}/chain-{chain_id}'
+        os.makedirs(f'{args.output_path}', exist_ok=True)
 
-    evaluate_samples(samples=cdag_samples[-1],
-                     scores=cdag_scores[-1], g_true=g_true, theta=theta)
-    display_sample_statistics(cdag_samples[-1], filepath=args.output_path)
+        log_filename = f'{args.output_path}/log.txt'
+        logging.basicConfig(filename=log_filename, force=True)
+        logging.info(f'CHAIN {chain_id}\n\n')
 
-    for i, graphs in enumerate(cdag_samples):
-        visualize_graphs(graphs, f'{args.output_path}/iter-{i}.png')
+        theta = random.normal(subk, (n, n))
 
-    if args.score == 'CIC':
-        parameters = {
-            'mean': np.array((data@theta_true).mean(axis=0)),
-            'cov': Cov_true,
+        init_params = {
+            'theta': theta,
+            'Cov': Cov_true,
         }
-        score = ScoreCIC(
-            data=data, dist=GaussianDistribution, parameters=parameters)
-    elif args.score == 'Bayesian':
-        score = BayesianCDAGScore(data=data,
-                                  theta=theta_true*g_true,
-                                  Cov=Cov_true,
-                                  min_clusters=args.min_clusters,
-                                  mean_clusters=args.max_clusters,
-                                  max_clusters=args.max_clusters)
 
-    opt_cdag = (grouping, group_dag)
-    opt_score = score(opt_cdag)
+        cdag_samples, cdag_scores, theta, loss_trace = train(data,
+                                                             init_params,
+                                                             args.score,
+                                                             args.max_em_iters,
+                                                             args.n_mcmc_samples,
+                                                             args.n_mcmc_warmup,
+                                                             args.min_clusters,
+                                                             args.max_clusters)
 
-    plot_graph_scores(cdag_scores, opt_score, args.output_path)
+        evaluate_samples(samples=cdag_samples[-1],
+                         scores=cdag_scores[-1],
+                         g_true=g_true,
+                         theta=theta,
+                         Cov=Cov_true,
+                         data=data)
+        display_sample_statistics(cdag_samples[-1], filepath=args.output_path)
 
-    logging.info('Estimated theta')
-    logging.info(theta)
+        for i, graphs in enumerate(cdag_samples):
+            visualize_graphs(graphs, f'{args.output_path}/iter-{i}.png')
 
-    with open(f'{args.output_path}/loss_trace.csv', 'w', newline='') as loss_trace_file:
-        wr = csv.writer(loss_trace_file)
-        loss_trace = list(map(lambda x: [x], loss_trace))
-        wr.writerows(loss_trace)
+        if args.score == 'CIC':
+            parameters = {
+                'mean': np.array((data@theta_true).mean(axis=0)),
+                'cov': Cov_true,
+            }
+            score = ScoreCIC(
+                data=data, dist=GaussianDistribution, parameters=parameters)
+        elif args.score == 'Bayesian':
+            score = BayesianCDAGScore(data=data,
+                                      theta=theta_true*g_true,
+                                      Cov=Cov_true,
+                                      min_clusters=args.min_clusters,
+                                      mean_clusters=args.max_clusters,
+                                      max_clusters=args.max_clusters)
 
-    plt.plot(loss_trace)
-    plt.savefig(f'{args.output_path}/loss_trace.png')
+        opt_cdag = (grouping, group_dag)
+        opt_score = score(opt_cdag)
+
+        plot_graph_scores(cdag_scores, opt_score, args.output_path)
+
+        logging.info('Estimated theta')
+        logging.info(theta)
+
+        with open(f'{args.output_path}/loss_trace.csv', 'w', newline='') as loss_trace_file:
+            wr = csv.writer(loss_trace_file)
+            loss_trace = list(map(lambda x: [x], loss_trace))
+            wr.writerows(loss_trace)
+
+        plt.plot(loss_trace)
+        plt.savefig(f'{args.output_path}/loss_trace.png')
 
 
 if __name__ == '__main__':

@@ -165,6 +165,8 @@ class CDAGSampler:
             K_t, G_t = self.step(
                 cb=lambda K: it.set_postfix_str(f'{len(K)} clusters'))
             self.samples.append((K_t, G_t))
+            self.scores.append(
+                (self.cluster_score(K_t), self.score((K_t, G_t))))
 
         it = tqdm(range(n_samples), 'Sampling with MCMC')
         for i in it:
@@ -175,10 +177,10 @@ class CDAGSampler:
                 (self.cluster_score(K_t), self.score((K_t, G_t))))
 
     def get_samples(self):
-        return self.samples[-self.n_samples:-1]
+        return self.samples[-(self.n_samples+1):-1]
 
     def get_scores(self):
-        return self.scores[-self.n_samples:-1]
+        return self.scores[-(self.n_samples+1):-1]
 
     def make_graph_dist(self, scores):
         support = len(scores)
@@ -283,8 +285,8 @@ def test():
                        [0, 0, 0, 0, 0],
                        [0, 0, 0, 0, 1],
                        [0, 0, 0, 0, 0]])
-    ecshd = expected_cluster_shd(g_true, sampler.get_samples())
-    print(f'E-CSHD: {ecshd}')
+    ecshd, ecshd_stddev = expected_cluster_shd(g_true, sampler.get_samples())
+    print(f'E-CSHD: {ecshd}+-{ecshd_stddev}')
 
 
 if __name__ == '__main__':
