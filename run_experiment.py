@@ -16,7 +16,7 @@ from models.gaussian import GaussianDistribution
 from scores.cic_score import ScoreCIC
 from scores.bayesian_cdag_score import BayesianCDAGScore
 from models.cluster_linear_gaussian_network import ClusterLinearGaussianNetwork
-from utils.metrics import expected_cluster_shd, expected_shd, expected_metrics, faithfulness_score, compute_nlls
+from utils.metrics import expected_cluster_shd, expected_shd, expected_metrics, faithfulness_score, compute_nlls, cluster_shd, shd_expanded_graph, metrics_expanded_graph
 from utils.c_dag import stringify_cdag, unstringify_cdag, clustering_to_matrix
 
 
@@ -82,16 +82,68 @@ def evaluate_samples(samples, scores, g_true, theta, Cov, data):
     eshd, eshd_stddev = expected_shd(samples, theta, g_true)
     logging.info(f'E-SHD: {eshd}+-{eshd_stddev}')
 
-    eshd_vcn, eshd_stddev_vcn, prc, rec = expected_metrics(
+    eshd_vcn, eshd_stddev_vcn, eprc, erec = expected_metrics(
         samples, theta, g_true)
     logging.info(
-        f'E-SHD (VCN): {eshd_vcn}+-{eshd_stddev_vcn}, E-PRC: {prc}, E-REC: {rec}')
+        f'E-SHD (VCN): {eshd_vcn}+-{eshd_stddev_vcn}, E-PRC: {eprc}, E-REC: {erec}')
 
     nll_mean, nll_stddev = compute_nlls(data, samples, theta, Cov)
     logging.info(f'NLL: {nll_mean}+-{nll_stddev}')
 
     faithfulness = faithfulness_score(samples, g_true)
     logging.info(f'Faithfulness score: {faithfulness}')
+
+    top_dag = samples[np.argmax(list(map(lambda x: x[0][0], scores)))]
+
+    logging.info('Best DAG metrics:')
+
+    cshd = cluster_shd(g_true, top_dag)
+    logging.info(f'CSHD: {cshd}')
+
+    shd = shd_expanded_graph(top_dag, theta, g_true)
+    logging.info(f'SHD: {eshd}')
+
+    shd, prc, rec = metrics_expanded_graph(top_dag, theta, g_true)
+    logging.info(f'SHD (VCN): {shd}, PRC: {prc}, REC: {rec}')
+
+    C_top, G_top = top_dag
+    m, n = data.shape
+    nll_top = -ClusterLinearGaussianNetwork(n).logpmf(
+        data, theta, Cov, clustering_to_matrix(C_top, len(C_top)), G_top)
+    logging.info(f'NLL: {nll_top}')
+
+    graph_counts = {}
+    for graph in samples:
+        graph_string = stringify_cdag(graph)
+        if graph_string not in graph_counts:
+            graph_counts[graph_string] = 0
+        graph_counts[graph_string] += 1
+    graphs = sorted(graph_counts, key=graph_counts.get, reverse=True)
+    graph_counts = [graph_counts[g] for g in graphs]
+    graph_info = list(zip(graphs, graph_counts))
+    logging.info(graph_info[:5])
+    graphs = [unstringify_cdag(g) for g in graphs]
+
+    logging.info('Most frequent DAG metrics:')
+
+    mode_dag = graphs[0]
+
+    logging.info('Best DAG metrics:')
+
+    cshd = cluster_shd(g_true, mode_dag)
+    logging.info(f'CSHD: {cshd}')
+
+    shd = shd_expanded_graph(mode_dag, theta, g_true)
+    logging.info(f'SHD: {eshd}')
+
+    shd, prc, rec = metrics_expanded_graph(mode_dag, theta, g_true)
+    logging.info(f'SHD (VCN): {shd}, PRC: {prc}, REC: {rec}')
+
+    C_top, G_top = mode_dag
+    m, n = data.shape
+    nll_top = -ClusterLinearGaussianNetwork(n).logpmf(
+        data, theta, Cov, clustering_to_matrix(C_top, len(C_top)), G_top)
+    logging.info(f'NLL: {nll_top}')
 
 
 def display_sample_statistics(samples, filepath):
