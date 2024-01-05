@@ -100,7 +100,7 @@ class DataGen:
                 self.theta = self.theta.at[3, 4].set(3)
 
         noise = np.sqrt(self.obs_noise) * \
-            np.random.normal(size=(n_samples, nvars))
+            random.normal(subkey, shape=(n_samples, nvars))
 
         toporder = g.topological_sorting()
 
@@ -179,7 +179,8 @@ class DataGen:
         return data, (true_graph, true_theta, true_cov)
 
     def generate_data_group_faithful(self, *, n_samples=100, N, k, p, var_params=10):
-        grouping, group_dag, dag = GroupFaithfulDAG().gen_group_faithful_dag(N, k, p)
+        grouping, group_dag, dag = GroupFaithfulDAG(
+            self.key).gen_group_faithful_dag(N, k, p)
 
         G = nx.from_numpy_array(dag,
                                 create_using=nx.MultiDiGraph())
@@ -188,10 +189,14 @@ class DataGen:
 
         toporder = g.topological_sorting()
 
-        noise = np.sqrt(self.obs_noise) * \
-            np.random.normal(size=(n_samples, N))
+        self.key, subkey = random.split(self.key)
 
-        self.theta = np.random.rand(N, N) * var_params
+        noise = np.sqrt(self.obs_noise) * \
+            random.normal(subkey, shape=(n_samples, N))
+
+        self.key, subkey = random.split(self.key)
+
+        self.theta = random.normal(subkey, shape=(N, N)) * var_params
 
         X = jnp.zeros((n_samples, N))
 

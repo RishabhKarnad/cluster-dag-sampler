@@ -1,14 +1,15 @@
 import networkx as nx
 import numpy as np
-import random
+from jax import random
+import jax.numpy as jnp
 import itertools
-import scipy.stats as stats
-
-
-random.seed(42)
+import jax.scipy.stats as stats
 
 
 class GroupFaithfulDAG:
+    def __init__(self, key):
+        self.key = key
+
     def get_cluster_matrix(self, W, N, n):
         C = np.zeros((N, n))
         for i, W_i in enumerate(W):
@@ -81,11 +82,10 @@ class GroupFaithfulDAG:
     def generate_graph(self, n, p):
         graph = np.zeros((n, n))
 
-        B = stats.bernoulli(p)
-
         for i in range(n):
             for j in range(i+1, n):
-                graph[i, j] = B.rvs()
+                self.key, subk = random.split(self.key)
+                graph[i, j] = random.bernoulli(subk, 0.5).astype(int).item()
 
         return graph
 
@@ -94,9 +94,15 @@ class GroupFaithfulDAG:
 
         group_dag = self.generate_graph(n, p)
 
-        W = list(map(set, np.array_split(np.random.permutation(N), n)))
+        self.key, subkey = random.split(self.key)
 
-        indices = [np.random.randint(len(W_i)) for W_i in W]
+        W = list(map(lambda x: set(x.tolist()), jnp.array_split(
+            random.permutation(subkey, x=N), n)))
+
+        self.key, subkey = random.split(self.key)
+
+        indices = [random.randint(subkey,
+                                  shape=(1,), minval=0, maxval=len(W_i)).item() for W_i in W]
         W_i = [list(W_i)[indices[i]] for i, W_i in enumerate(W)]
 
         C = self.get_cluster_matrix(W, N, n)
@@ -109,7 +115,9 @@ class GroupFaithfulDAG:
         H_indeps = self.get_group_dag_indeps(group_dag, group_names)
 
         for _ in range(1000):
-            [u, v] = random.sample(range(N), 2)
+            self.key, subk = random.split(self.key)
+            [u, v] = random.choice(subk, jnp.arange(
+                N), shape=(2,), replace=False)
 
             G_prime = G.copy()
 
