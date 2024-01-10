@@ -180,8 +180,8 @@ def compute_nlls(data, samples, theta, Cov):
     return np.mean(nlls), np.std(nlls)
 
 
-def faithfulness_score(samples, g_true):
-    group_faithful_model = GroupFaithfulDAG()
+def faithfulness_score(samples, g_true, *, key):
+    group_faithful_model = GroupFaithfulDAG(key)
     count = 0
     for groups, group_dag in samples:
         group_names = list(map(lambda x: {x}, np.arange(group_dag.shape[0])))

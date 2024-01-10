@@ -16,8 +16,8 @@ class GaussianDistribution:
             raise RuntimeError(
                 f'Dimension of data {n} does not match number of variables {self.n_vars} of distribution')
 
-        self.mean = np.mean(data, axis=0)
-        self.cov = np.cov(data.T)
+        self.mean = np.array(np.mean(data, axis=0))
+        self.cov = np.array(np.cov(data.T))
 
         self.dist = stats.multivariate_normal(self.mean, self.cov)
 
