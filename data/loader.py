@@ -207,6 +207,40 @@ class DataGen:
 
         return X
 
+    def generate_group_scm_data_confounder(self, n_samples=100):
+        C = clustering_to_matrix([{0, 1, 2}, {3, 4}, {5, 6}], k=3)
+
+        G_C = np.array([[0, 1, 0],
+                        [0, 0, 0],
+                        [0, 1, 0]])
+
+        ks = list(map(int, C.sum(axis=0)))
+        n_vars = C.shape[0]
+
+        self.key, subkey = random.split(self.key)
+        theta = random.normal(subkey, shape=(n_vars, n_vars))
+
+        self.key, subkey = random.split(self.key)
+        Z_1 = random.normal(subkey, shape=(n_samples,)).repeat(
+            ks[0]).reshape(n_samples, -1)
+
+        self.key, subkey = random.split(self.key)
+        Z_2 = random.normal(subkey, shape=(n_samples,)).repeat(
+            ks[1]).reshape(n_samples, -1)
+
+        self.key, subkey = random.split(self.key)
+        Z_3 = random.normal(subkey, shape=(n_samples,)).repeat(
+            ks[2]).reshape(n_samples, -1)
+
+        Z = np.hstack([Z_1, Z_2, Z_3])
+
+        G_expand = C@G_C@C.T
+        W = theta * G_expand
+
+        X = Z @ np.linalg.inv(np.eye(n_vars) - W)
+
+        return X
+
     def generate_er_dag(self, n, p):
         self.key, subkey = random.split(self.key)
         L = jnp.tril(random.bernoulli(subkey, p, shape=(n, n)), -1)
