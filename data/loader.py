@@ -4,6 +4,7 @@ import matplotlib.pyplot as plt
 import igraph as ig
 from jax import random
 import jax.numpy as jnp
+import jax.scipy.stats as stats
 from pgmpy.models import LinearGaussianBayesianNetwork
 from pgmpy.factors.continuous import LinearGaussianCPD
 import scipy
@@ -11,6 +12,7 @@ import pandas
 import cdt.data
 
 from data.group_faithful import GroupFaithfulDAG
+from utils.c_dag import clustering_to_matrix
 
 
 class DataGen:
@@ -159,6 +161,51 @@ class DataGen:
                 X = X.at[:, j].set(noise[:, j])
 
         return X, self.theta
+
+    def generate_group_scm_data(self, n_samples=100):
+
+        C = clustering_to_matrix([{0, 1, 2}, {3, 4}, {5, 6}], k=3)
+
+        G_C = np.array([[0, 1, 0],
+                        [0, 0, 0],
+                        [0, 1, 0]])
+
+        ks = list(map(int, C.sum(axis=0)))
+        n_vars = C.shape[0]
+
+        self.key, subkey = random.split(self.key)
+        theta = random.normal(subkey, shape=(n_vars, n_vars))
+
+        self.key, subkey = random.split(self.key)
+        mu_1 = np.zeros(ks[0])
+        sigma_1 = np.array([[1, 0.5, 0.2],
+                            [0.5, 1, 0.5],
+                            [0.2, 0.5, 1]])
+        Z_1 = random.multivariate_normal(
+            subkey, mu_1, sigma_1, shape=(n_samples,))
+
+        self.key, subkey = random.split(self.key)
+        mu_2 = np.zeros(ks[1])
+        sigma_2 = np.array([[1, 0.3],
+                            [0.3, 1]])
+        Z_2 = random.multivariate_normal(
+            subkey, mu_2, sigma_2, shape=(n_samples,))
+
+        self.key, subkey = random.split(self.key)
+        mu_3 = np.zeros(ks[2])
+        sigma_3 = np.array([[1, 0.45],
+                            [0.45, 1]])
+        Z_3 = random.multivariate_normal(
+            subkey, mu_3, sigma_3, shape=(n_samples,))
+
+        Z = np.hstack([Z_1, Z_2, Z_3])
+
+        G_expand = C@G_C@C.T
+        W = theta * G_expand
+
+        X = Z @ np.linalg.inv(np.eye(n_vars) - W)
+
+        return X
 
     def load_sachs_data(self):
         data, true_graph = cdt.data.load_dataset('sachs')
