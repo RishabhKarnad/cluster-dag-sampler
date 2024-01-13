@@ -7,7 +7,7 @@ import jax.numpy as jnp
 import jax.scipy.stats as stats
 from pgmpy.models import LinearGaussianBayesianNetwork
 from pgmpy.factors.continuous import LinearGaussianCPD
-import scipy
+import scipy.sparse as sparse
 import pandas
 import cdt.data
 
@@ -204,6 +204,52 @@ class DataGen:
         W = theta * G_expand
 
         X = Z @ np.linalg.inv(np.eye(n_vars) - W)
+
+        return X
+
+    def generate_er_dag(self, n, p):
+        self.key, subkey = random.split(self.key)
+        L = jnp.tril(random.bernoulli(subkey, p, shape=(n, n)), -1)
+        self.key, subkey = random.split(self.key)
+        perm = random.permutation(subkey, n)
+        return L[jnp.ix_(perm, perm)]
+
+    def generate_random_group_scm_data(self,
+                                       n_samples=100, *,
+                                       n_clusters=3,
+                                       group_sizes=[3, 2, 2],
+                                       group_edge_densities=[0.3, 0.3, 0.3],
+                                       group_dag_density=0.3,
+                                       interaction_sparsity=0.2):
+        intra_group_dags = [self.generate_er_dag(k, p)
+                            for k, p in zip(group_sizes, group_edge_densities)]
+        G_C = self.generate_er_dag(len(group_sizes), group_dag_density)
+
+        C_list = [sorted(offset - np.arange(k) - 1)
+                  for k, offset in zip(group_sizes, np.cumsum(group_sizes))]
+        C = clustering_to_matrix(C_list, len(group_sizes))
+
+        G_expand = C@G_C@C.T
+        n = G_expand.shape[0]
+
+        self.key, subkey = random.split(self.key)
+        theta = random.normal(subkey, (n, n))
+
+        self.key, subkey = random.split(self.key)
+        sparse_matrix = sparse.random(
+            n, n, interaction_sparsity, random_state=subkey[0].item()).todense()
+        mask = np.where(sparse_matrix > 0, 1, 0)
+        G_expand = mask * G_expand
+
+        self.key, subkey = random.split(self.key)
+        Z = random.normal(subkey, shape=(n_samples, n))
+
+        for C_i, G_clus in zip(C_list, intra_group_dags):
+            G_expand = G_expand.at[np.ix_(C_i, C_i)].set(G_clus)
+
+        W = theta * G_expand
+
+        X = Z @ np.linalg.inv(np.eye(n) - W)
 
         return X
 
