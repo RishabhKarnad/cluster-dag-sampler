@@ -141,7 +141,7 @@ def shd_expanded_graph(cdag, theta, true_dag):
 
     true_dag = true_dag*G_expand
 
-    return SHD(G, true_dag)
+    return SHD(G, np.array(true_dag))
 
 
 def metrics_expanded_graph(cdag, theta, true_dag):

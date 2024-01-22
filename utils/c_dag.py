@@ -39,6 +39,18 @@ def clustering_to_matrix(C, k):
     return m
 
 
+def matrix_to_clustering(C):
+    C_seq = []
+    d, k = C.shape
+    for i in range(k):
+        C_i = set()
+        for j in range(d):
+            if C[j, i] == 1:
+                C_i.add(j)
+        C_seq.append(C_i)
+    return C_seq
+
+
 def test():
     cdag = ([{1, 4, 3}, {5, 2}, {0, 14}], np.array(
         [[0,  0, 0], [0, 0, 1], [0, 0, 0]]))

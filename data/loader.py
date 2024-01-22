@@ -205,7 +205,7 @@ class DataGen:
 
         X = Z @ np.linalg.inv(np.eye(n_vars) - W)
 
-        return X
+        return X, (G_C,)
 
     def generate_group_scm_data_confounder(self, n_samples=100):
         C = clustering_to_matrix([{0, 1, 2}, {3, 4}, {5, 6}], k=3)
@@ -221,16 +221,23 @@ class DataGen:
         theta = random.normal(subkey, shape=(n_vars, n_vars))
 
         self.key, subkey = random.split(self.key)
-        Z_1 = random.normal(subkey, shape=(n_samples,)).repeat(
-            ks[0]).reshape(n_samples, -1)
+        mu1 = np.zeros(ks[0])
+        cov1 = np.array([[1, 0.99, 0.99],
+                         [0.99, 1, 0.99],
+                         [0.99, 0.99, 1]])
+        Z_1 = random.multivariate_normal(subkey, mu1, cov1, shape=(n_samples,))
 
         self.key, subkey = random.split(self.key)
-        Z_2 = random.normal(subkey, shape=(n_samples,)).repeat(
-            ks[1]).reshape(n_samples, -1)
+        mu2 = np.zeros(ks[1])
+        cov2 = np.array([[1, 0.99],
+                         [0.99, 1]])
+        Z_2 = random.multivariate_normal(subkey, mu2, cov2, shape=(n_samples,))
 
         self.key, subkey = random.split(self.key)
-        Z_3 = random.normal(subkey, shape=(n_samples,)).repeat(
-            ks[2]).reshape(n_samples, -1)
+        mu3 = np.zeros(ks[2])
+        cov3 = np.array([[1, 0.99],
+                         [0.99, 1]])
+        Z_3 = random.multivariate_normal(subkey, mu3, cov3, shape=(n_samples,))
 
         Z = np.hstack([Z_1, Z_2, Z_3])
 
@@ -239,7 +246,7 @@ class DataGen:
 
         X = Z @ np.linalg.inv(np.eye(n_vars) - W)
 
-        return X
+        return X, (G_C,)
 
     def generate_er_dag(self, n, p):
         self.key, subkey = random.split(self.key)
@@ -285,7 +292,7 @@ class DataGen:
 
         X = Z @ np.linalg.inv(np.eye(n) - W)
 
-        return X
+        return X, (G_C,)
 
     def load_sachs_data(self):
         data, true_graph = cdt.data.load_dataset('sachs')
