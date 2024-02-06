@@ -5,7 +5,7 @@ from copy import deepcopy
 from dataclasses import dataclass
 from tqdm import tqdm
 import jax.random as random
-
+import jax.numpy as jnp
 from models.upper_triangular import UpperTriangular
 
 from utils.sys import debugger_is_active
@@ -89,7 +89,7 @@ class ProposalDistribution:
                 i, c = int(i), int(c)
                 self.key, subk = random.split(self.key)
                 c_new = set(random.choice(
-                    subk, sorted(neighbour[i]), c, replace=False))
+                    subk, jnp.array(sorted(neighbour[i])), (c,), replace=False).tolist())
                 neighbour[i] -= c_new
                 neighbour.insert(i + 1, c_new)
             case ['reverse', i]:
@@ -99,10 +99,10 @@ class ProposalDistribution:
                 i, c1, c2 = int(i), int(c1), int(c2)
                 self.key, subk = random.split(self.key)
                 c1_subset = set(random.choice(
-                    subk, sorted(neighbour[i]), c1, replace=False))
+                    subk, jnp.array(sorted(neighbour[i])), (c1,), replace=False).tolist())
                 self.key, subk = random.split(self.key)
                 c2_subset = set(random.choice(
-                    subk, sorted(neighbour[i+1]), c2, replace=False))
+                    subk, jnp.array(sorted(neighbour[i+1])), (c2,), replace=False).tolist())
                 neighbour[i] -= c1_subset
                 neighbour[i+1].update(c1_subset)
                 neighbour[i+1] -= c2_subset

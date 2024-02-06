@@ -417,8 +417,8 @@ def run(args):
                                                              args.max_clusters)
 
         ground_truth_is_cdag = args.dataset in [
-            'group_scm',
-            'group_scm_confounder',
+            # 'group_scm',
+            # 'group_scm_confounder',
             'group_scm_random',
         ]
 
