@@ -16,6 +16,9 @@ MAX_PARENTS = 2
 N_WARMUP = 100
 N_SAMPLES = 500
 
+eps = 1 / 10**256
+log_eps = np.log(eps)
+
 
 class ProposalDistribution:
     def __init__(self, C, min_clusters, max_clusters):
@@ -270,7 +273,7 @@ class CDAGSampler:
             score += np.exp(graph_score)
             graphs.append(E)
             graph_scores.append(graph_score)
-        score = np.log(score)
+        score = np.log(score + eps)
         return score, graphs, graph_scores
 
     def sample_graphs(self, K, *, n_samples=None):
