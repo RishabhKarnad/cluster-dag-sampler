@@ -1,9 +1,12 @@
 import numpy as np
 from itertools import combinations
+import jax.random as random
+import scipy.stats as stats
 
 
 class UpperTriangular:
     def __init__(self, n):
+        self.key = random.PRNGKey(678)
         self.n = n
         self.mask = np.zeros((self.n, self.n))
         for i in range(n):
@@ -11,7 +14,8 @@ class UpperTriangular:
                 self.mask[i, j] = 1
 
     def sample(self):
-        return self.mask * np.random.randint(0, 2, (self.n, self.n))
+        self.key, subk = random.split(self.key)
+        return self.mask * stats.randint.rvs(low=0, high=2, size=(self.n, self.n), random_state=self.key[0].item())
 
     def sample_n(self, n_samples=1):
         return np.array([self.sample() for _ in range(n_samples)])

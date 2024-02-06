@@ -4,6 +4,7 @@ from scipy.special import comb
 from copy import deepcopy
 from dataclasses import dataclass
 from tqdm import tqdm
+import jax.random as random
 
 from models.upper_triangular import UpperTriangular
 
@@ -18,6 +19,8 @@ N_SAMPLES = 500
 
 class ProposalDistribution:
     def __init__(self, C, min_clusters, max_clusters):
+        self.key = random.PRNGKey(678)
+
         self.C = C
         self.k = len(C)
 
@@ -81,8 +84,9 @@ class ProposalDistribution:
                 neighbour[i].update(neighbour.pop(i+1))
             case ['split', i, c]:
                 i, c = int(i), int(c)
-                c_new = set(np.random.choice(
-                    sorted(neighbour[i]), c, replace=False))
+                self.key, subk = random.split(self.key)
+                c_new = set(random.choice(
+                    subk, sorted(neighbour[i]), c, replace=False))
                 neighbour[i] -= c_new
                 neighbour.insert(i + 1, c_new)
             case ['reverse', i]:
@@ -90,10 +94,12 @@ class ProposalDistribution:
                 neighbour[i], neighbour[i+1] = neighbour[i+1], neighbour[i]
             case ['exchange', i, c1, c2]:
                 i, c1, c2 = int(i), int(c1), int(c2)
-                c1_subset = set(np.random.choice(
-                    sorted(neighbour[i]), c1, replace=False))
-                c2_subset = set(np.random.choice(
-                    sorted(neighbour[i+1]), c2, replace=False))
+                self.key, subk = random.split(self.key)
+                c1_subset = set(random.choice(
+                    subk, sorted(neighbour[i]), c1, replace=False))
+                self.key, subk = random.split(self.key)
+                c2_subset = set(random.choice(
+                    subk, sorted(neighbour[i+1]), c2, replace=False))
                 neighbour[i] -= c1_subset
                 neighbour[i+1].update(c1_subset)
                 neighbour[i+1] -= c2_subset
@@ -102,7 +108,9 @@ class ProposalDistribution:
         return neighbour
 
     def sample(self):
-        j = stats.randint(0, self.total_neighbours).rvs()
+        self.key, subk = random.split(self.key)
+        j = stats.randint(0, self.total_neighbours).rvs(
+            random_state=self.key[0].item())
         for idx in reversed(range(len(self.neighbour_counts))):
             if j < self.neighbour_counts[idx]:
                 return self.gen_neighbour(self.neighbours[idx])
@@ -119,6 +127,8 @@ class ProposalDistribution:
 
 class CDAGSampler:
     def __init__(self, *, data, score, min_clusters=None, max_clusters=None, initial_sample=None):
+        self.key = random.PRNGKey(678)
+
         m, n = data.shape
 
         self.n_nodes = n
@@ -157,10 +167,10 @@ class CDAGSampler:
         self.Cov = Cov
 
     def make_random_partitioning(self, n_partitions):
-        variables = range(self.n_nodes)
-        variables = np.random.permutation(variables)
+        self.key, subk = random.split(self.key)
+        variables = random.permutation(subk, self.n_nodes)
         partitioning = np.array_split(variables, n_partitions)
-        partitioning = [set(K_i) for K_i in partitioning]
+        partitioning = [set(K_i.tolist()) for K_i in partitioning]
         return partitioning
 
     def sample(self, n_samples=N_SAMPLES, n_warmup=N_WARMUP):
@@ -198,7 +208,8 @@ class CDAGSampler:
             name='categorical', a=0, b=(support), inc=1, values=(np.arange(support), params))
 
     def step(self, cb=None):
-        alpha = self.U.rvs()
+        self.key, subk = random.split(self.key)
+        alpha = self.U.rvs(random_state=self.key[0].item())
 
         if alpha < 0.01:
             # Small probability of staying in same state to make Markov Chain ergodic
@@ -214,13 +225,15 @@ class CDAGSampler:
             u = self.U.rvs()
             a = self.log_prob_accept(K_star)
             if np.log(u) < a:
+                self.key, subk = random.split(self.key)
                 graph_index = self.make_graph_dist(
-                    self.ctx['graph_scores']).rvs()
+                    self.ctx['graph_scores']).rvs(random_state=self.key[0].item())
                 graph = self.ctx['graphs'][graph_index]
                 return K_star, graph
             else:
+                self.key, subk = random.split(self.key)
                 graph_index = self.make_graph_dist(
-                    self.ctx['prev_graph_scores']).rvs()
+                    self.ctx['prev_graph_scores']).rvs(random_state=self.key[0].item())
                 graph = self.ctx['prev_graphs'][graph_index]
                 return self.samples[-1][0], graph
 
