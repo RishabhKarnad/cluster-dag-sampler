@@ -18,13 +18,24 @@ from scores.bayesian_cdag_score import BayesianCDAGScore
 from models.cluster_linear_gaussian_network import ClusterLinearGaussianNetwork
 from utils.metrics import expected_cluster_shd, expected_shd, expected_metrics, faithfulness_score, compute_nlls, cluster_shd, shd_expanded_graph, metrics_expanded_graph
 from utils.c_dag import stringify_cdag, unstringify_cdag, clustering_to_matrix
+from utils.sys import initialize_logger
 
 
-MCMC_N_WARMUP = 100
-MCMC_N_SAMPLES = 500
+datasets = [
+    'faithful_vstruct',
+    'faithful_novstruct',
+    'unfaithful_vstruct',
+    'unfaithful_novstruct',
+    'group_faithful',
+    'group_scm',
+    'group_scm_confounder',
+    'group_scm_random',
+    '3var',
+    '4var',
+]
 
 
-def make_arg_parser():
+def parse_args():
     parser = ArgumentParser(prog='C-DAG MCMC runner',
                             description='Run MCMC sampler for C-DAGs with arguments')
 
@@ -34,13 +45,11 @@ def make_arg_parser():
     #     '--data', choices=['discrete_4', 'discrete_8', 'continuous_5'])
     parser.add_argument('--score', type=str, choices=['CIC', 'Bayesian'])
 
-    parser.add_argument('--group_faithful',
-                        action=argparse.BooleanOptionalAction)
-    parser.add_argument('--faithful', action=argparse.BooleanOptionalAction)
-    parser.add_argument('--vstruct', action=argparse.BooleanOptionalAction)
+    parser.add_argument('--dataset', type=str, choices=datasets)
+
     parser.add_argument('--n_data_samples', type=int)
-    parser.add_argument('--n_mcmc_samples', type=int, default=MCMC_N_SAMPLES)
-    parser.add_argument('--n_mcmc_warmup', type=int, default=MCMC_N_WARMUP)
+    parser.add_argument('--n_mcmc_samples', type=int, default=5000)
+    parser.add_argument('--n_mcmc_warmup', type=int, default=1000)
 
     parser.add_argument('--num_chains', type=int, default=1)
 
@@ -51,21 +60,12 @@ def make_arg_parser():
 
     parser.add_argument('--output_path', type=str)
 
-    return parser
+    args = parser.parse_args()
+
+    return args
 
 
-def initialize_logger(output_path=None):
-    if output_path is None:
-        output_path = './results'
-
-    log_filename = f'{output_path}/log.txt'
-
-    os.makedirs(os.path.dirname(log_filename), exist_ok=True)
-    logging.basicConfig(
-        filename=log_filename, encoding='utf-8', filemode='w', level=logging.INFO)
-
-
-def evaluate_samples(samples, scores, g_true, theta, Cov, data):
+def evaluate_samples(samples, scores, g_true, theta, Cov, data, ground_truth_is_cdag=False):
     for i, sample in enumerate(samples):
         logging.info(f'[Sample {i}]')
         C, G = sample
@@ -76,34 +76,52 @@ def evaluate_samples(samples, scores, g_true, theta, Cov, data):
         logging.info(f'    graph_score: {score_CIC}')
     logging.info('=========================')
 
-    ecshd, ecshd_stddev = expected_cluster_shd(g_true, samples)
-    logging.info(f'E-CSHD: {ecshd}+-{ecshd_stddev}')
+    if ground_truth_is_cdag:
+        samples_metric = list(
+            map(lambda G_C: (list(range(len(G_C[0]))), G_C[1]), samples))
+    else:
+        samples_metric = samples
 
-    eshd, eshd_stddev = expected_shd(samples, theta, g_true)
-    logging.info(f'E-SHD: {eshd}+-{eshd_stddev}')
+    if not ground_truth_is_cdag:
+        ecshd, ecshd_stddev = expected_cluster_shd(g_true, samples_metric)
+        logging.info(f'E-CSHD: {ecshd}+-{ecshd_stddev}')
+
+    if ground_truth_is_cdag:
+        pass
+    else:
+        eshd, eshd_stddev = expected_shd(samples_metric, theta, g_true)
+        logging.info(f'E-SHD: {eshd}+-{eshd_stddev}')
 
     eshd_vcn, eshd_stddev_vcn, eprc, erec = expected_metrics(
-        samples, theta, g_true)
+        samples_metric, theta, g_true)
     logging.info(
         f'E-SHD (VCN): {eshd_vcn}+-{eshd_stddev_vcn}, E-PRC: {eprc}, E-REC: {erec}')
 
     nll_mean, nll_stddev = compute_nlls(data, samples, theta, Cov)
     logging.info(f'NLL: {nll_mean}+-{nll_stddev}')
 
-    faithfulness = faithfulness_score(samples, g_true)
-    logging.info(f'Faithfulness score: {faithfulness}')
+    if not ground_truth_is_cdag:
+        faithfulness = faithfulness_score(
+            samples, g_true, key=random.PRNGKey(123))
+        logging.info(f'Faithfulness score: {faithfulness}')
 
     top_dag = samples[np.argmax(list(map(lambda x: x[0][0], scores)))]
 
+    if ground_truth_is_cdag:
+        top_dag_metric = (list(range(len(top_dag[0]))), top_dag[1])
+    else:
+        top_dag_metric = top_dag
+
     logging.info('Best DAG metrics:')
 
-    cshd = cluster_shd(g_true, top_dag)
-    logging.info(f'CSHD: {cshd}')
+    if not ground_truth_is_cdag:
+        cshd = cluster_shd(g_true, top_dag_metric)
+        logging.info(f'CSHD: {cshd}')
 
-    shd = shd_expanded_graph(top_dag, theta, g_true)
-    logging.info(f'SHD: {eshd}')
+        shd = shd_expanded_graph(top_dag_metric, theta, g_true)
+        logging.info(f'SHD: {eshd}')
 
-    shd, prc, rec = metrics_expanded_graph(top_dag, theta, g_true)
+    shd, prc, rec = metrics_expanded_graph(top_dag_metric, theta, g_true)
     logging.info(f'SHD (VCN): {shd}, PRC: {prc}, REC: {rec}')
 
     C_top, G_top = top_dag
@@ -128,15 +146,21 @@ def evaluate_samples(samples, scores, g_true, theta, Cov, data):
 
     mode_dag = graphs[0]
 
-    logging.info('Best DAG metrics:')
+    if ground_truth_is_cdag:
+        mode_dag_metric = (list(range(len(mode_dag[0]))), mode_dag[1])
+    else:
+        mode_dag_metric = mode_dag
 
-    cshd = cluster_shd(g_true, mode_dag)
-    logging.info(f'CSHD: {cshd}')
+    logging.info('Most frequent DAG metrics:')
 
-    shd = shd_expanded_graph(mode_dag, theta, g_true)
-    logging.info(f'SHD: {eshd}')
+    if not ground_truth_is_cdag:
+        cshd = cluster_shd(g_true, mode_dag_metric)
+        logging.info(f'CSHD: {cshd}')
 
-    shd, prc, rec = metrics_expanded_graph(mode_dag, theta, g_true)
+        shd = shd_expanded_graph(mode_dag_metric, theta, g_true)
+        logging.info(f'SHD: {eshd}')
+
+    shd, prc, rec = metrics_expanded_graph(mode_dag_metric, theta, g_true)
     logging.info(f'SHD (VCN): {shd}, PRC: {prc}, REC: {rec}')
 
     C_top, G_top = mode_dag
@@ -227,9 +251,6 @@ def train(data, init_params, score_type, max_em_iters, n_mcmc_samples, n_mcmc_wa
     samples = []
     scores = []
 
-    def record_loss_trace(loss_val):
-        loss_trace.append(loss_val)
-
     m, n = data.shape
     theta, Cov = init_params['theta'], init_params['Cov']
 
@@ -238,18 +259,16 @@ def train(data, init_params, score_type, max_em_iters, n_mcmc_samples, n_mcmc_wa
     for i in range(max_em_iters):
         print(f'EM iteration {i+1}/{max_em_iters}')
 
-        parameters = {
-            'mean': np.array((data@theta).mean(axis=0)),
-            'cov': Cov,
-        }
-
         if score_type == 'CIC':
             score = ScoreCIC(
-                data=data, dist=GaussianDistribution, parameters=parameters)
+                data=data,
+                dist=GaussianDistribution,
+                parameters={
+                    'mean': np.array((data@theta).mean(axis=0)),
+                    'cov': Cov,
+                })
         elif score_type == 'Bayesian':
             score = BayesianCDAGScore(data=data,
-                                      theta=theta,
-                                      Cov=Cov,
                                       min_clusters=min_clusters,
                                       mean_clusters=max_clusters,
                                       max_clusters=max_clusters)
@@ -259,6 +278,7 @@ def train(data, init_params, score_type, max_em_iters, n_mcmc_samples, n_mcmc_wa
                                    min_clusters=min_clusters,
                                    max_clusters=max_clusters,
                                    initial_sample=initial_cdag_sample)
+        cdag_sampler.set_parameters(theta, None)
 
         cdag_sampler.sample(n_samples=n_mcmc_samples, n_warmup=n_mcmc_warmup)
 
@@ -274,7 +294,7 @@ def train(data, init_params, score_type, max_em_iters, n_mcmc_samples, n_mcmc_wa
                  max_mle_iters=args.max_mle_iters,
                  samples=samples_i,
                  scores=scores_i,
-                 cb=record_loss_trace)
+                 cb=lambda loss_val: loss_trace.append(loss_val))
 
         theta = clgn.theta
 
@@ -284,17 +304,67 @@ def train(data, init_params, score_type, max_em_iters, n_mcmc_samples, n_mcmc_wa
     return samples, scores, theta, loss_trace
 
 
-def main(args):
+def gen_data(key, args):
+    datagen = DataGen(key, 0.1)
+    if args.dataset == 'faithful_vstruct':
+        dataobj = (datagen.generate_data_continuous_5(
+            n_samples=args.n_data_samples, vstruct=True, faithful=True))
+        return dataobj, datagen.key
+    elif args.dataset == 'faithful_novstruct':
+        dataobj = (datagen.generate_data_continuous_5(
+            n_samples=args.n_data_samples, vstruct=False, faithful=True))
+        return dataobj, datagen.key
+    elif args.dataset == 'unfaithful_vstruct':
+        dataobj = (datagen.generate_data_continuous_5(
+            n_samples=args.n_data_samples, vstruct=True, faithful=False))
+        return dataobj, datagen.key
+    elif args.dataset == 'unfaithful_novstruct':
+        dataobj = (datagen.generate_data_continuous_5(
+            n_samples=args.n_data_samples, vstruct=False, faithful=False))
+        return dataobj, datagen.key
+    elif args.dataset == 'group_faithful':
+        dataobj = (datagen.generate_data_group_faithful(
+            n_samples=args.n_data_samples, N=10, k=3, p=0.2))
+        return dataobj, datagen.key
+    elif args.dataset == 'group_scm':
+        dataobj = (datagen.generate_group_scm_data(
+            n_samples=args.n_data_samples))
+        return dataobj, datagen.key
+    elif args.dataset == 'group_scm_confounder':
+        dataobj = (datagen.generate_group_scm_data(
+            n_samples=args.n_data_samples))
+        return dataobj, datagen.key
+    elif args.dataset == 'group_scm_random':
+        dataobj = (datagen.generate_random_group_scm_data(
+            n_samples=args.n_data_samples))
+        return dataobj, datagen.key
+    elif args.dataset == '3var':
+        dataobj = (datagen.generate_group_scm_data_small_dag(
+            n_samples=args.n_data_samples))
+        return dataobj, datagen.key
+    elif args.dataset == '4var':
+        dataobj = (datagen.generate_group_scm_data_small_dag_4vars(
+            n_samples=args.n_data_samples))
+        return dataobj, datagen.key
+    else:
+        raise RuntimeError('Invalid dataset')
+
+
+def run(args):
     key = random.PRNGKey(args.random_seed)
 
-    n_samples = args.n_data_samples
+    (data, scm), key_ = gen_data(key, args)
 
-    if args.group_faithful:
-        data, (g_true, theta_true, Cov_true, grouping, group_dag) = DataGen(
-            key, 0.1).generate_data_group_faithful(n_samples=n_samples, N=10, k=3, p=0.2)
+    if args.dataset in [
+        'group_scm',
+        'group_scm_confounder',
+        'group_scm_random',
+        '3var',
+        '4var',
+    ]:
+        (g_true, theta_true, Cov_true, grouping, group_dag) = scm
     else:
-        data, (g_true, theta_true, Cov_true, grouping, group_dag) = DataGen(key, 0.1).generate_data_continuous_5(
-            n_samples=n_samples, vstruct=args.vstruct, faithful=args.faithful)
+        (g_true,) = scm
 
     m, n = data.shape
 
@@ -317,8 +387,6 @@ def main(args):
     logging.info(
         '============================================================')
 
-    key_, subk = random.split(key)
-
     base_path = args.output_path
 
     for i in range(args.num_chains):
@@ -331,6 +399,7 @@ def main(args):
         logging.basicConfig(filename=log_filename, force=True)
         logging.info(f'CHAIN {chain_id}\n\n')
 
+        key_, subk = random.split(key_)
         theta = random.normal(subk, (n, n))
 
         init_params = {
@@ -347,34 +416,42 @@ def main(args):
                                                              args.min_clusters,
                                                              args.max_clusters)
 
+        ground_truth_is_cdag = args.dataset in [
+            'group_scm',
+            'group_scm_confounder',
+            'group_scm_random',
+        ]
+
         evaluate_samples(samples=cdag_samples[-1],
                          scores=cdag_scores[-1],
                          g_true=g_true,
                          theta=theta,
                          Cov=Cov_true,
-                         data=data)
+                         data=data,
+                         ground_truth_is_cdag=ground_truth_is_cdag)
         display_sample_statistics(cdag_samples[-1], filepath=args.output_path)
 
         for i, graphs in enumerate(cdag_samples):
             visualize_graphs(graphs, f'{args.output_path}/iter-{i}.png')
 
         if args.score == 'CIC':
-            parameters = {
-                'mean': np.array((data@theta_true).mean(axis=0)),
-                'cov': Cov_true,
-            }
             score = ScoreCIC(
-                data=data, dist=GaussianDistribution, parameters=parameters)
+                data=data,
+                dist=GaussianDistribution,
+                parameters={
+                    'mean': np.array((data@theta_true).mean(axis=0)),
+                    'cov': Cov_true,
+                })
         elif args.score == 'Bayesian':
             score = BayesianCDAGScore(data=data,
-                                      theta=theta_true*g_true,
-                                      Cov=Cov_true,
                                       min_clusters=args.min_clusters,
                                       mean_clusters=args.max_clusters,
                                       max_clusters=args.max_clusters)
 
         opt_cdag = (grouping, group_dag)
-        opt_score = score(opt_cdag)
+        opt_score = score(opt_cdag,
+                          theta=theta_true*g_true,
+                          Cov=Cov_true)
 
         plot_graph_scores(cdag_scores, opt_score, args.output_path)
 
@@ -391,9 +468,8 @@ def main(args):
 
 
 if __name__ == '__main__':
-    parser = make_arg_parser()
-    args = parser.parse_args()
+    args = parse_args()
 
     initialize_logger(output_path=args.output_path)
 
-    main(args)
+    run(args)

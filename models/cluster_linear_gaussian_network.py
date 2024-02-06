@@ -1,11 +1,10 @@
-import numpy as np
 import jax
 import jax.numpy as jnp
 from jax.scipy import stats
 import optax
 from tqdm import tqdm
 
-from utils.c_dag import clustering_to_matrix
+from utils.c_dag import clustering_to_matrix, get_covariance_for_clustering
 
 
 def zero_pad(A, k):
@@ -19,8 +18,9 @@ def zero_pad(A, k):
 
 
 class ClusterLinearGaussianNetwork:
-    def __init__(self, n_vars):
+    def __init__(self, n_vars, *, mask_covariance=False):
         self.n_vars = n_vars
+        self.mask_covariance = mask_covariance
 
     def fit(self, data, *,
             theta,
@@ -47,11 +47,13 @@ class ClusterLinearGaussianNetwork:
         optimizer = optax.adam(mle_step_size)
         opt_state = optimizer.init(params)
 
+        Covs = jax.vmap(get_covariance_for_clustering, (0), 0)(Cs)
+
         def loss_fn(params):
-            return self.loss(data, params['theta'], Cov, Cs, Gs)
+            return self.loss(data, params['theta'], Covs, Cs, Gs)
 
         for _ in tqdm(range(max_mle_iters), 'Estimating theta'):
-            l = self.loss(data, params['theta'], Cov, Cs, Gs)
+            l = self.loss(data, params['theta'], Covs, Cs, Gs)
             cb(l.item())
             grads = jax.grad(loss_fn)(params)
             updates, opt_state = optimizer.update(grads, opt_state)
@@ -61,15 +63,19 @@ class ClusterLinearGaussianNetwork:
         self.cdag_samples = samples
         self.cdag_scores = scores
 
-    def loss(self, X, theta, Cov, Cs, Gs):
-        return -jnp.mean(jax.vmap(self.logpmf, (None, None, None, 0, 0), 0)(X, theta, Cov, Cs, Gs))
+    def loss(self, X, theta, Covs, Cs, Gs):
+        return -jnp.mean(jax.vmap(self.logpmf, (None, None, 0, 0, 0), 0)(X, theta, Covs, Cs, Gs))
 
-    def logpmf(self, X, theta, Cov, C, G):
+    def logpmf(self, X, theta, Cov_, C, G):
         G_expand = C@G@C.T
         mean_expected = X@(G_expand*theta)
-        G_cov = C@C.T
-        Cov_mask = G_cov*Cov
-        return jnp.mean(stats.multivariate_normal.logpdf(X, mean_expected, Cov_mask))
+        Cov = get_covariance_for_clustering(C)
+        if self.mask_covariance:
+            G_cov = C@C.T
+            Cov_mask = G_cov*Cov
+            return jnp.mean(stats.multivariate_normal.logpdf(X, mean_expected, Cov_mask))
+        else:
+            return jnp.mean(stats.multivariate_normal.logpdf(X, mean_expected, Cov))
 
     def pmf(self, X, theta, Cov, C, G):
         return jnp.exp(self.logpmf(X, theta, Cov, C, G))

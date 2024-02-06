@@ -1,4 +1,5 @@
 import numpy as np
+import jax.numpy as jnp
 
 if __name__ != '__main__':
     from utils.permutation import make_permutation_matrix
@@ -49,6 +50,16 @@ def matrix_to_clustering(C):
                 C_i.add(j)
         C_seq.append(C_i)
     return C_seq
+
+
+def get_covariance_for_clustering(C, sigma=0.1, rho=0.99):
+    d = C.shape[0]
+    I = jnp.eye(d)
+    F = jnp.ones(shape=(d, d))
+    Cov = sigma * (I + rho*(F - I))
+    mask = C@C.T
+    Cov = Cov * mask
+    return Cov
 
 
 def test():

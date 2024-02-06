@@ -1,20 +1,19 @@
 #! /bin/bash
 
 DIR=$(date +"%Y-%m-%d-%T")
-mkdir -p results/$DIR/bayesian/faithful-vstruct
-mkdir -p results/$DIR/bayesian/faithful-novstruct
-mkdir -p results/$DIR/bayesian/nofaithful-vstruct
-mkdir -p results/$DIR/bayesian/nofaithful-novstruct
-mkdir -p results/$DIR/bayesian/group-faithful
 
-N_DATA_SAMPLES=1000
+mkdir -p results/$DIR/bayesian/3var
+mkdir -p results/$DIR/bayesian/4var
+mkdir -p results/$DIR/bayesian/group_scm_confounder
+
+
+N_DATA_SAMPLES=10000
 N_MCMC_SAMPLES=1000
 N_MCMC_WARMUP=250
 MAX_EM_ITERS=5
 MAX_MLE_ITERS=1000
-MIN_CLUSTERS=3
-MAX_CLUSTERS=3
-NUM_CHAINS=4
+NUM_CHAINS=20
+
 
 python run_experiment.py \
     --score 'Bayesian' \
@@ -23,12 +22,11 @@ python run_experiment.py \
     --n_mcmc_warmup $N_MCMC_WARMUP \
     --max_em_iters $MAX_EM_ITERS \
     --max_mle_iters $MAX_MLE_ITERS \
-    --min_clusters $MIN_CLUSTERS \
-    --max_clusters $MAX_CLUSTERS \
+    --min_clusters 2 \
+    --max_clusters 2 \
     --num_chains $NUM_CHAINS \
-    --faithful \
-    --vstruct \
-    --output_path results/$DIR/bayesian/faithful-vstruct
+    --dataset '3var' \
+    --output_path results/$DIR/bayesian/3var
 
 python run_experiment.py \
     --score 'Bayesian' \
@@ -37,12 +35,11 @@ python run_experiment.py \
     --n_mcmc_warmup $N_MCMC_WARMUP \
     --max_em_iters $MAX_EM_ITERS \
     --max_mle_iters $MAX_MLE_ITERS \
-    --min_clusters $MIN_CLUSTERS \
-    --max_clusters $MAX_CLUSTERS \
+    --min_clusters 2 \
+    --max_clusters 2 \
     --num_chains $NUM_CHAINS \
-    --faithful \
-    --no-vstruct \
-    --output_path results/$DIR/bayesian/faithful-novstruct
+    --dataset '4var' \
+    --output_path results/$DIR/bayesian/4var
 
 python run_experiment.py \
     --score 'Bayesian' \
@@ -51,36 +48,9 @@ python run_experiment.py \
     --n_mcmc_warmup $N_MCMC_WARMUP \
     --max_em_iters $MAX_EM_ITERS \
     --max_mle_iters $MAX_MLE_ITERS \
-    --min_clusters $MIN_CLUSTERS \
-    --max_clusters $MAX_CLUSTERS \
+    --min_clusters 3 \
+    --max_clusters 3 \
     --num_chains $NUM_CHAINS \
-    --no-faithful \
-    --vstruct \
-    --output_path results/$DIR/bayesian/nofaithful-vstruct
+    --dataset 'group_scm_confounder' \
+    --output_path results/$DIR/bayesian/group_scm_confounder
 
-python run_experiment.py \
-    --score 'Bayesian' \
-    --n_data_samples $N_DATA_SAMPLES \
-    --n_mcmc_samples $N_MCMC_SAMPLES \
-    --n_mcmc_warmup $N_MCMC_WARMUP \
-    --max_em_iters $MAX_EM_ITERS \
-    --max_mle_iters $MAX_MLE_ITERS \
-    --min_clusters $MIN_CLUSTERS \
-    --max_clusters $MAX_CLUSTERS \
-    --num_chains $NUM_CHAINS \
-    --no-faithful \
-    --no-vstruct \
-    --output_path results/$DIR/bayesian/nofaithful-novstruct
-
-python run_experiment.py \
-    --score 'Bayesian' \
-    --n_data_samples $N_DATA_SAMPLES \
-    --n_mcmc_samples $N_MCMC_SAMPLES \
-    --n_mcmc_warmup $N_MCMC_WARMUP \
-    --max_em_iters $MAX_EM_ITERS \
-    --max_mle_iters $MAX_MLE_ITERS \
-    --min_clusters 4 \
-    --max_clusters 4 \
-    --num_chains $NUM_CHAINS \
-    --group_faithful \
-    --output_path results/$DIR/bayesian/group-faithful

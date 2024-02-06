@@ -143,11 +143,18 @@ class CDAGSampler:
 
         self.ctx = {}
 
+        self.theta = None
+        self.Cov = None
+
         self.debug = debugger_is_active()
 
     def _reset(self, K_init, G_init):
         self.samples = [(K_init, G_init)]
         self.scores = []
+
+    def set_parameters(self, theta, Cov):
+        self.theta = theta
+        self.Cov = Cov
 
     def make_random_partitioning(self, n_partitions):
         variables = range(self.n_nodes)
@@ -166,7 +173,7 @@ class CDAGSampler:
                 cb=lambda K: it.set_postfix_str(f'{len(K)} clusters'))
             self.samples.append((K_t, G_t))
             self.scores.append(
-                (self.cluster_score(K_t), self.score((K_t, G_t))))
+                (self.cluster_score(K_t), self.score((K_t, G_t), self.theta, self.Cov)))
 
         it = tqdm(range(n_samples), 'Sampling with MCMC')
         for i in it:
@@ -174,7 +181,7 @@ class CDAGSampler:
                 cb=lambda K: it.set_postfix_str(f'{len(K)} clusters'))
             self.samples.append((K_t, G_t))
             self.scores.append(
-                (self.cluster_score(K_t), self.score((K_t, G_t))))
+                (self.cluster_score(K_t), self.score((K_t, G_t), self.theta, self.Cov)))
 
     def get_samples(self):
         return self.samples[-(self.n_samples+1):-1]
@@ -260,7 +267,7 @@ class CDAGSampler:
         return UpperTriangular(len(K)).sample_n(n_samples)
 
     def graph_score(self, G_C):
-        return self.score(G_C)
+        return self.score(G_C, self.theta, self.Cov)
 
 
 def test():
