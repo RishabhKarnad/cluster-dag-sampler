@@ -21,19 +21,31 @@ from utils.c_dag import stringify_cdag, unstringify_cdag, clustering_to_matrix
 from utils.sys import initialize_logger
 
 
+datasets = [
+    'faithful_vstruct',
+    'faithful_novstruct',
+    'unfaithful_vstruct',
+    'unfaithful_novstruct',
+    'group_faithful',
+    'group_scm',
+    'group_scm_confounder',
+    'group_scm_random',
+    '3var',
+    '4var',
+]
+
+
 def parse_args():
     parser = ArgumentParser(prog='C-DAG MCMC runner',
                             description='Run MCMC sampler for C-DAGs with arguments')
 
     parser.add_argument('--random_seed', type=int, default=42)
 
+    # parser.add_argument(
+    #     '--data', choices=['discrete_4', 'discrete_8', 'continuous_5'])
     parser.add_argument('--score', type=str, choices=['CIC', 'Bayesian'])
 
-    parser.add_argument('--dataset', type=str, choices=[
-        '3var',
-        '4var',
-        '7var',
-    ])
+    parser.add_argument('--dataset', type=str, choices=datasets)
 
     parser.add_argument('--n_data_samples', type=int)
     parser.add_argument('--n_mcmc_samples', type=int, default=5000)
@@ -53,7 +65,7 @@ def parse_args():
     return args
 
 
-def evaluate_samples(samples, scores, g_true, theta, Cov, data):
+def evaluate_samples(samples, scores, g_true, theta, Cov, data, ground_truth_is_cdag=False):
     for i, sample in enumerate(samples):
         logging.info(f'[Sample {i}]')
         C, G = sample
@@ -294,9 +306,37 @@ def train(data, init_params, score_type, max_em_iters, n_mcmc_samples, n_mcmc_wa
 
 def gen_data(key, args):
     datagen = DataGen(key, 0.1)
-    if args.dataset == '7var':
+    if args.dataset == 'faithful_vstruct':
+        dataobj = (datagen.generate_data_continuous_5(
+            n_samples=args.n_data_samples, vstruct=True, faithful=True))
+        return dataobj, datagen.key
+    elif args.dataset == 'faithful_novstruct':
+        dataobj = (datagen.generate_data_continuous_5(
+            n_samples=args.n_data_samples, vstruct=False, faithful=True))
+        return dataobj, datagen.key
+    elif args.dataset == 'unfaithful_vstruct':
+        dataobj = (datagen.generate_data_continuous_5(
+            n_samples=args.n_data_samples, vstruct=True, faithful=False))
+        return dataobj, datagen.key
+    elif args.dataset == 'unfaithful_novstruct':
+        dataobj = (datagen.generate_data_continuous_5(
+            n_samples=args.n_data_samples, vstruct=False, faithful=False))
+        return dataobj, datagen.key
+    elif args.dataset == 'group_faithful':
+        dataobj = (datagen.generate_data_group_faithful(
+            n_samples=args.n_data_samples, N=10, k=3, p=0.2))
+        return dataobj, datagen.key
+    elif args.dataset == 'group_scm':
         dataobj = (datagen.generate_group_scm_data(
-            n_samples=args.n_data_samples, confounded=True))
+            n_samples=args.n_data_samples))
+        return dataobj, datagen.key
+    elif args.dataset == 'group_scm_confounder':
+        dataobj = (datagen.generate_group_scm_data(
+            n_samples=args.n_data_samples))
+        return dataobj, datagen.key
+    elif args.dataset == 'group_scm_random':
+        dataobj = (datagen.generate_random_group_scm_data(
+            n_samples=args.n_data_samples))
         return dataobj, datagen.key
     elif args.dataset == '3var':
         dataobj = (datagen.generate_group_scm_data_small_dag(
@@ -315,7 +355,16 @@ def run(args):
 
     (data, scm), key_ = gen_data(key, args)
 
-    (g_true, theta_true, Cov_true, grouping, group_dag) = scm
+    if args.dataset in [
+        'group_scm',
+        'group_scm_confounder',
+        'group_scm_random',
+        '3var',
+        '4var',
+    ]:
+        (g_true, theta_true, Cov_true, grouping, group_dag) = scm
+    else:
+        (g_true,) = scm
 
     m, n = data.shape
 
