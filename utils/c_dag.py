@@ -1,5 +1,6 @@
 import numpy as np
 import jax.numpy as jnp
+import networkx as nx
 
 if __name__ != '__main__':
     from utils.permutation import make_permutation_matrix
@@ -60,6 +61,12 @@ def get_covariance_for_clustering(C, sigma=0.1, rho=0.99):
     mask = C@C.T
     Cov = Cov * mask
     return Cov
+
+
+def count_toposorts(M):
+    g = nx.from_numpy_array(M, create_using=nx.DiGraph())
+    toposorts = list(nx.all_topological_sorts(g))
+    return len(toposorts)
 
 
 def test():

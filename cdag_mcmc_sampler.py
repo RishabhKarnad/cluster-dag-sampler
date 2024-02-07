@@ -9,6 +9,7 @@ import jax.numpy as jnp
 from models.upper_triangular import UpperTriangular
 
 from utils.sys import debugger_is_active
+from utils.c_dag import matrix_to_clustering, count_toposorts
 
 from rng import random_state
 
@@ -64,8 +65,8 @@ class ProposalDistribution:
 
         # Exchanges
         for i in range(self.k-1):
-            for c1 in range(1, len(self.C[i])):
-                for c2 in range(1, len(self.C[i+1])):
+            for c1 in range(1, len(self.C[i])+1):
+                for c2 in range(1, len(self.C[i+1])+1):
                     self.neighbours.append(f'exchange-{i}-{c1}-{c2}')
                     last_count = self.neighbour_counts[-1]
                     self.neighbour_counts.append(
@@ -137,7 +138,8 @@ class CDAGSampler:
         self.max_clusters = max_clusters or n
 
         if initial_sample is None:
-            K_init = self.make_random_partitioning(self.max_clusters)
+            K_init = matrix_to_clustering(
+                self.make_random_clustering(self.max_clusters))
             G_init = UpperTriangular(len(K_init)).sample()
             initial_sample = (K_init, G_init)
 
@@ -166,12 +168,17 @@ class CDAGSampler:
         self.theta = theta
         self.Cov = Cov
 
-    def make_random_partitioning(self, n_partitions):
-        subk = random_state.get_key()
-        variables = random.permutation(subk, self.n_nodes)
-        partitioning = np.array_split(variables, n_partitions)
-        partitioning = [set(K_i.tolist()) for K_i in partitioning]
-        return partitioning
+    def make_random_clustering(self, n_clusters):
+        done = False
+        while not done:
+            C = np.zeros((self.n_nodes, n_clusters))
+            for i in range(self.n_nodes):
+                subk = random_state.get_key()
+                j = random.choice(subk, n_clusters)
+                C[i, j] = 1
+            if (np.sum(C, axis=0) > 0).all():
+                done = True
+        return C
 
     def sample(self, n_samples=N_SAMPLES, n_warmup=N_WARMUP):
         self.n_samples = n_samples
@@ -280,7 +287,7 @@ class CDAGSampler:
         return UpperTriangular(len(K)).sample_n(n_samples)
 
     def graph_score(self, G_C):
-        return self.score(G_C, self.theta, self.Cov)
+        return self.score(G_C, self.theta, self.Cov) - np.log(count_toposorts(G_C[1]))
 
 
 def test():
