@@ -14,10 +14,11 @@ import cdt.data
 from data.group_faithful import GroupFaithfulDAG
 from utils.c_dag import clustering_to_matrix
 
+from rng import random_state
+
 
 class DataGen:
-    def __init__(self, key, obs_noise):
-        self.key = key
+    def __init__(self, obs_noise):
         self.obs_noise = obs_noise
         self.adjacency_matrix = None
         self.theta = None
@@ -89,15 +90,15 @@ class DataGen:
             sigma_3 = np.array([[1, 0.45],
                                 [0.45, 1]])
 
-        self.key, subkey = random.split(self.key)
+        subkey = random_state.get_key()
         Z_1 = random.multivariate_normal(
             subkey, mu_1, sigma_1, shape=(n_samples,))
 
-        self.key, subkey = random.split(self.key)
+        subkey = random_state.get_key()
         Z_2 = random.multivariate_normal(
             subkey, mu_2, sigma_2, shape=(n_samples,))
 
-        self.key, subkey = random.split(self.key)
+        subkey = random_state.get_key()
         Z_3 = random.multivariate_normal(
             subkey, mu_3, sigma_3, shape=(n_samples,))
 
@@ -138,11 +139,11 @@ class DataGen:
         sigma_1 = 0.1*np.array([[1, 0.99], [0.99, 1]])
         sigma_2 = np.array([[0.1]])
 
-        self.key, subkey = random.split(self.key)
+        subkey = random_state.get_key()
         Z_1 = random.multivariate_normal(
             subkey, mu_1, sigma_1, shape=(n_samples,))
 
-        self.key, subkey = random.split(self.key)
+        subkey = random_state.get_key()
         Z_2 = random.multivariate_normal(
             subkey, mu_2, sigma_2, shape=(n_samples,))
 
@@ -183,11 +184,11 @@ class DataGen:
         sigma_1 = 0.1*np.array([[1, 0.99], [0.99, 1]])
         sigma_2 = 0.1*np.array([[1, 0.99], [0.99, 1]])
 
-        self.key, subkey = random.split(self.key)
+        subkey = random_state.get_key()
         Z_1 = random.multivariate_normal(
             subkey, mu_1, sigma_1, shape=(n_samples,))
 
-        self.key, subkey = random.split(self.key)
+        subkey = random_state.get_key()
         Z_2 = random.multivariate_normal(
             subkey, mu_2, sigma_2, shape=(n_samples,))
 

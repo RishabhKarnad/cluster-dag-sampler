@@ -10,6 +10,7 @@ from models.upper_triangular import UpperTriangular
 
 from utils.sys import debugger_is_active
 
+from rng import random_state
 
 MAX_PARENTS = 2
 
@@ -22,8 +23,6 @@ log_eps = np.log(eps)
 
 class ProposalDistribution:
     def __init__(self, C, min_clusters, max_clusters):
-        self.key = random.PRNGKey(678)
-
         self.C = C
         self.k = len(C)
 
@@ -87,7 +86,7 @@ class ProposalDistribution:
                 neighbour[i].update(neighbour.pop(i+1))
             case ['split', i, c]:
                 i, c = int(i), int(c)
-                self.key, subk = random.split(self.key)
+                subk = random_state.get_key()
                 c_new = set(random.choice(
                     subk, jnp.array(sorted(neighbour[i])), (c,), replace=False).tolist())
                 neighbour[i] -= c_new
@@ -97,10 +96,10 @@ class ProposalDistribution:
                 neighbour[i], neighbour[i+1] = neighbour[i+1], neighbour[i]
             case ['exchange', i, c1, c2]:
                 i, c1, c2 = int(i), int(c1), int(c2)
-                self.key, subk = random.split(self.key)
+                subk = random_state.get_key()
                 c1_subset = set(random.choice(
                     subk, jnp.array(sorted(neighbour[i])), (c1,), replace=False).tolist())
-                self.key, subk = random.split(self.key)
+                subk = random_state.get_key()
                 c2_subset = set(random.choice(
                     subk, jnp.array(sorted(neighbour[i+1])), (c2,), replace=False).tolist())
                 neighbour[i] -= c1_subset
@@ -111,9 +110,9 @@ class ProposalDistribution:
         return neighbour
 
     def sample(self):
-        self.key, subk = random.split(self.key)
+        seed = random_state.get_random_number()
         j = stats.randint(0, self.total_neighbours).rvs(
-            random_state=self.key[0].item())
+            random_state=seed)
         for idx in reversed(range(len(self.neighbour_counts))):
             if j < self.neighbour_counts[idx]:
                 return self.gen_neighbour(self.neighbours[idx])
@@ -130,8 +129,6 @@ class ProposalDistribution:
 
 class CDAGSampler:
     def __init__(self, *, data, score, min_clusters=None, max_clusters=None, initial_sample=None):
-        self.key = random.PRNGKey(678)
-
         m, n = data.shape
 
         self.n_nodes = n
@@ -170,7 +167,7 @@ class CDAGSampler:
         self.Cov = Cov
 
     def make_random_partitioning(self, n_partitions):
-        self.key, subk = random.split(self.key)
+        subk = random_state.get_key()
         variables = random.permutation(subk, self.n_nodes)
         partitioning = np.array_split(variables, n_partitions)
         partitioning = [set(K_i.tolist()) for K_i in partitioning]
@@ -211,8 +208,8 @@ class CDAGSampler:
             name='categorical', a=0, b=(support), inc=1, values=(np.arange(support), params))
 
     def step(self, cb=None):
-        self.key, subk = random.split(self.key)
-        alpha = self.U.rvs(random_state=self.key[0].item())
+        seed = random_state.get_random_number()
+        alpha = self.U.rvs(random_state=seed)
 
         if alpha < 0.01:
             # Small probability of staying in same state to make Markov Chain ergodic
@@ -228,15 +225,15 @@ class CDAGSampler:
             u = self.U.rvs()
             a = self.log_prob_accept(K_star)
             if np.log(u) < a:
-                self.key, subk = random.split(self.key)
+                seed = random_state.get_random_number()
                 graph_index = self.make_graph_dist(
-                    self.ctx['graph_scores']).rvs(random_state=self.key[0].item())
+                    self.ctx['graph_scores']).rvs(random_state=seed)
                 graph = self.ctx['graphs'][graph_index]
                 return K_star, graph
             else:
-                self.key, subk = random.split(self.key)
+                seed = random_state.get_random_number()
                 graph_index = self.make_graph_dist(
-                    self.ctx['prev_graph_scores']).rvs(random_state=self.key[0].item())
+                    self.ctx['prev_graph_scores']).rvs(random_state=seed)
                 graph = self.ctx['prev_graphs'][graph_index]
                 return self.samples[-1][0], graph
 
