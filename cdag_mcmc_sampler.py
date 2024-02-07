@@ -288,37 +288,3 @@ class CDAGSampler:
 
     def graph_score(self, G_C):
         return self.score(G_C, self.theta, self.Cov) - np.log(count_toposorts(G_C[1]))
-
-
-def test():
-    data, _ = generate_data_continuous_5(n_samples=100)
-    dist = GaussianDistribution
-
-    sampler = CDAGSampler(data=data, dist=dist)
-    print(sampler.count_neighbours([{1}, {2, 3}, {4, 5}]))
-    sampler.sample(n_warmup=N_WARMUP, n_samples=N_SAMPLES)
-    for i, sample in enumerate(sampler.samples[N_WARMUP:-1]):
-        print(f'[Sample {i}]')
-        C, G = sample
-        score_C, score_CIC = sampler.scores[i]
-        print(f'    C: {C}')
-        print(f'    G: {G}')
-        print(f'    cluster score: {score_C[0]}')
-        print(f'    graph_score: {score_CIC}')
-    print('=========================')
-
-    g_true = np.array([[0, 1, 1, 0, 0],
-                       [0, 0, 1, 1, 0],
-                       [0, 0, 0, 0, 0],
-                       [0, 0, 0, 0, 1],
-                       [0, 0, 0, 0, 0]])
-    ecshd, ecshd_stddev = expected_cluster_shd(g_true, sampler.get_samples())
-    print(f'E-CSHD: {ecshd}+-{ecshd_stddev}')
-
-
-if __name__ == '__main__':
-    from data.continuous import generate_data_continuous_5
-    from models.gaussian import GaussianDistribution
-    from utils.metrics import expected_cluster_shd
-
-    test()
