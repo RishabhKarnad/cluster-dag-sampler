@@ -6,6 +6,8 @@ from dataclasses import dataclass
 from tqdm import tqdm
 import jax.random as random
 import jax.numpy as jnp
+from functools import reduce
+
 from models.upper_triangular import UpperTriangular
 
 from utils.sys import debugger_is_active
@@ -267,17 +269,15 @@ class CDAGSampler:
         return min(0, rho)
 
     def cluster_score(self, K):
-        score = 0
         graphs = []
         graph_scores = []
         for E in self.sample_graphs(K):
             V = [sorted(K_i) for K_i in K]
             G_C = (V, E)
             graph_score = self.graph_score(G_C)
-            score += np.exp(graph_score)
             graphs.append(E)
             graph_scores.append(graph_score)
-        score = np.log(score + eps)
+        score = reduce(np.logaddexp, graph_scores)
         return score, graphs, graph_scores
 
     def sample_graphs(self, K, *, n_samples=None):
