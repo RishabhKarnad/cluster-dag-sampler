@@ -6,10 +6,14 @@ from dataclasses import dataclass
 from tqdm import tqdm
 import jax.random as random
 import jax.numpy as jnp
+from functools import reduce
+
 from models.upper_triangular import UpperTriangular
 
 from utils.sys import debugger_is_active
+from utils.c_dag import matrix_to_clustering, count_toposorts
 
+from rng import random_state
 
 MAX_PARENTS = 2
 
@@ -22,8 +26,6 @@ log_eps = np.log(eps)
 
 class ProposalDistribution:
     def __init__(self, C, min_clusters, max_clusters):
-        self.key = random.PRNGKey(678)
-
         self.C = C
         self.k = len(C)
 
@@ -65,8 +67,8 @@ class ProposalDistribution:
 
         # Exchanges
         for i in range(self.k-1):
-            for c1 in range(1, len(self.C[i])):
-                for c2 in range(1, len(self.C[i+1])):
+            for c1 in range(1, len(self.C[i])+1):
+                for c2 in range(1, len(self.C[i+1])+1):
                     self.neighbours.append(f'exchange-{i}-{c1}-{c2}')
                     last_count = self.neighbour_counts[-1]
                     self.neighbour_counts.append(
@@ -87,7 +89,7 @@ class ProposalDistribution:
                 neighbour[i].update(neighbour.pop(i+1))
             case ['split', i, c]:
                 i, c = int(i), int(c)
-                self.key, subk = random.split(self.key)
+                subk = random_state.get_key()
                 c_new = set(random.choice(
                     subk, jnp.array(sorted(neighbour[i])), (c,), replace=False).tolist())
                 neighbour[i] -= c_new
@@ -97,10 +99,10 @@ class ProposalDistribution:
                 neighbour[i], neighbour[i+1] = neighbour[i+1], neighbour[i]
             case ['exchange', i, c1, c2]:
                 i, c1, c2 = int(i), int(c1), int(c2)
-                self.key, subk = random.split(self.key)
+                subk = random_state.get_key()
                 c1_subset = set(random.choice(
                     subk, jnp.array(sorted(neighbour[i])), (c1,), replace=False).tolist())
-                self.key, subk = random.split(self.key)
+                subk = random_state.get_key()
                 c2_subset = set(random.choice(
                     subk, jnp.array(sorted(neighbour[i+1])), (c2,), replace=False).tolist())
                 neighbour[i] -= c1_subset
@@ -111,9 +113,9 @@ class ProposalDistribution:
         return neighbour
 
     def sample(self):
-        self.key, subk = random.split(self.key)
+        seed = random_state.get_random_number()
         j = stats.randint(0, self.total_neighbours).rvs(
-            random_state=self.key[0].item())
+            random_state=seed)
         for idx in reversed(range(len(self.neighbour_counts))):
             if j < self.neighbour_counts[idx]:
                 return self.gen_neighbour(self.neighbours[idx])
@@ -130,8 +132,6 @@ class ProposalDistribution:
 
 class CDAGSampler:
     def __init__(self, *, data, score, min_clusters=None, max_clusters=None, initial_sample=None):
-        self.key = random.PRNGKey(678)
-
         m, n = data.shape
 
         self.n_nodes = n
@@ -140,7 +140,8 @@ class CDAGSampler:
         self.max_clusters = max_clusters or n
 
         if initial_sample is None:
-            K_init = self.make_random_partitioning(self.max_clusters)
+            K_init = matrix_to_clustering(
+                self.make_random_clustering(self.max_clusters))
             G_init = UpperTriangular(len(K_init)).sample()
             initial_sample = (K_init, G_init)
 
@@ -169,12 +170,17 @@ class CDAGSampler:
         self.theta = theta
         self.Cov = Cov
 
-    def make_random_partitioning(self, n_partitions):
-        self.key, subk = random.split(self.key)
-        variables = random.permutation(subk, self.n_nodes)
-        partitioning = np.array_split(variables, n_partitions)
-        partitioning = [set(K_i.tolist()) for K_i in partitioning]
-        return partitioning
+    def make_random_clustering(self, n_clusters):
+        done = False
+        while not done:
+            C = np.zeros((self.n_nodes, n_clusters))
+            for i in range(self.n_nodes):
+                subk = random_state.get_key()
+                j = random.choice(subk, n_clusters)
+                C[i, j] = 1
+            if (np.sum(C, axis=0) > 0).all():
+                done = True
+        return C
 
     def sample(self, n_samples=N_SAMPLES, n_warmup=N_WARMUP):
         self.n_samples = n_samples
@@ -211,8 +217,8 @@ class CDAGSampler:
             name='categorical', a=0, b=(support), inc=1, values=(np.arange(support), params))
 
     def step(self, cb=None):
-        self.key, subk = random.split(self.key)
-        alpha = self.U.rvs(random_state=self.key[0].item())
+        seed = random_state.get_random_number()
+        alpha = self.U.rvs(random_state=seed)
 
         if alpha < 0.01:
             # Small probability of staying in same state to make Markov Chain ergodic
@@ -228,15 +234,15 @@ class CDAGSampler:
             u = self.U.rvs()
             a = self.log_prob_accept(K_star)
             if np.log(u) < a:
-                self.key, subk = random.split(self.key)
+                seed = random_state.get_random_number()
                 graph_index = self.make_graph_dist(
-                    self.ctx['graph_scores']).rvs(random_state=self.key[0].item())
+                    self.ctx['graph_scores']).rvs(random_state=seed)
                 graph = self.ctx['graphs'][graph_index]
                 return K_star, graph
             else:
-                self.key, subk = random.split(self.key)
+                seed = random_state.get_random_number()
                 graph_index = self.make_graph_dist(
-                    self.ctx['prev_graph_scores']).rvs(random_state=self.key[0].item())
+                    self.ctx['prev_graph_scores']).rvs(random_state=seed)
                 graph = self.ctx['prev_graphs'][graph_index]
                 return self.samples[-1][0], graph
 
@@ -263,17 +269,15 @@ class CDAGSampler:
         return min(0, rho)
 
     def cluster_score(self, K):
-        score = 0
         graphs = []
         graph_scores = []
         for E in self.sample_graphs(K):
             V = [sorted(K_i) for K_i in K]
             G_C = (V, E)
             graph_score = self.graph_score(G_C)
-            score += np.exp(graph_score)
             graphs.append(E)
             graph_scores.append(graph_score)
-        score = np.log(score + eps)
+        score = reduce(np.logaddexp, graph_scores)
         return score, graphs, graph_scores
 
     def sample_graphs(self, K, *, n_samples=None):
@@ -283,7 +287,7 @@ class CDAGSampler:
         return UpperTriangular(len(K)).sample_n(n_samples)
 
     def graph_score(self, G_C):
-        return self.score(G_C, self.theta, self.Cov)
+        return self.score(G_C, self.theta, self.Cov) - np.log(count_toposorts(G_C[1]))
 
 
 def test():

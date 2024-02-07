@@ -4,7 +4,7 @@ DIR=$(date +"%Y-%m-%d-%T")
 
 mkdir -p results/$DIR/bayesian/3var
 mkdir -p results/$DIR/bayesian/4var
-mkdir -p results/$DIR/bayesian/group_scm_confounder
+mkdir -p results/$DIR/bayesian/7var
 
 
 N_DATA_SAMPLES=10000
@@ -51,6 +51,6 @@ python run_experiment.py \
     --min_clusters 3 \
     --max_clusters 3 \
     --num_chains $NUM_CHAINS \
-    --dataset 'group_scm_confounder' \
-    --output_path results/$DIR/bayesian/group_scm_confounder
+    --dataset '7var' \
+    --output_path results/$DIR/bayesian/7var
 
