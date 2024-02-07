@@ -14,11 +14,15 @@ from utils.c_dag import clustering_to_matrix
 def sample_clustering(n_dims):
     # k = stats.randint(1, n_dims+1).rvs()
     k = 3
-    C = [set() for _ in range(k)]
-    for i in range(n_dims):
-        cluster = stats.randint(0, k).rvs()
-        C[cluster].add(i)
-    C = list(filter(lambda s: len(s) > 0, C))
+    done = False
+    while not done:
+        C = [set() for _ in range(k)]
+        for i in range(n_dims):
+            cluster = stats.randint(0, k).rvs()
+            C[cluster].add(i)
+        C = list(filter(lambda s: len(s) > 0, C))
+        if len(C) == 3:
+            done = True
     return C
 
 
@@ -159,16 +163,11 @@ def main():
     import pandas as pd
 
     from scores.cic_score import ScoreCIC
-    # from models.bernoulli import MultivariateBernoulliDistribution
     from models.gaussian import GaussianDistribution
     from data.loader import DataGen
     import jax.random as random
 
     from utils.metrics import shd_expanded_graph, faithfulness_score, metrics_expanded_graph
-
-    # data = generate_data_discrete_v2(n_samples=1000)
-    # score_CIC = ScoreCIC(
-    #     data=data, dist=MultivariateBernoulliDistribution)
 
     filepath = f'./results/greedy/{datetime.now().isoformat()}'
     os.makedirs(filepath, exist_ok=True)
@@ -177,24 +176,33 @@ def main():
 
     key = random.PRNGKey(123)
 
-    data, (g_true, theta_true, Cov_true, C_true, G_C_true) = DataGen(
-        key=key, obs_noise=0.1).generate_data_continuous_5(n_samples=1000)
+    # data, (g_true, theta_true, Cov_true, C_true, G_C_true) = DataGen(
+    #     key=key, obs_noise=0.1).generate_data_continuous_5(n_samples=1000)
+    data, (g_true,) = DataGen(
+        key, 0.1).generate_group_scm_data_confounder(n_samples=1000)
     score_CIC = ScoreCIC(
         data=data, dist=GaussianDistribution)
 
     stats = pd.DataFrame(
         columns=['run', 'shd', 'precision', 'recall', 'is_faithful'])
 
+    optimal_score = score_CIC(([{0, 1, 2}, {3, 4}, {5, 6}], g_true))
+    logging.info(f'Optimal graph score {optimal_score}')
+
     best_score = None
-    for i in range(10):
+    for i in range(20):
         logging.info(f'RUN {i}')
 
         (C, G_C), graph_score, scores = find_cdag(
             data, score=score_CIC, steps=1000, logger=logging, desc=f'Run {i}')
 
-        shd = shd_expanded_graph((C, G_C), None, g_true)
-        is_faithful = faithfulness_score([(C, G_C)], g_true, key=key) == 1
-        shd_vcn, prc, rec = metrics_expanded_graph((C, G_C), None, g_true)
+        C_dummy = list(map(lambda x: {x}, range(len(C))))
+
+        shd = shd_expanded_graph((C_dummy, G_C), None, g_true)
+        is_faithful = faithfulness_score(
+            [(C_dummy, G_C)], g_true, key=key) == 1
+        shd_vcn, prc, rec = metrics_expanded_graph(
+            (C_dummy, G_C), None, g_true)
 
         logging.info(f'SHD: {shd}')
         logging.info(f'Precision: {prc}')
