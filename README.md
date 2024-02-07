@@ -23,5 +23,4 @@ Edit `run` to modify experiment parameters
 |N_MCMC_WARMUP|Number of warmup samples during one EM iteration|`int`|250|
 |MAX_EM_ITERS|Number of EM steps|`int`|5|
 |MAX_MLE_ITERS|Number of optimizer iterations for parameter optimization during one EM step|`int`|500|
-|MIN_CLUSTERS|Minimum number of allowed clusters in a sampled clustering|`int`|2|
-|MAX_CLUSTERS|Maximum number of allowed clusters in a sampled clustering|`int`|3|
+|NUM_CHAINS|Number of MCMC chains|`int`|20|
