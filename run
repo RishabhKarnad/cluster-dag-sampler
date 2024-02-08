@@ -44,10 +44,10 @@ python run_experiment.py \
 python run_experiment.py \
     --score 'Bayesian' \
     --n_data_samples $N_DATA_SAMPLES \
-    --n_mcmc_samples $N_MCMC_SAMPLES \
-    --n_mcmc_warmup $N_MCMC_WARMUP \
-    --max_em_iters $MAX_EM_ITERS \
-    --max_mle_iters $MAX_MLE_ITERS \
+    --n_mcmc_samples 2000 \
+    --n_mcmc_warmup 500 \
+    --max_em_iters 10 \
+    --max_mle_iters 1000 \
     --min_clusters 3 \
     --max_clusters 3 \
     --num_chains $NUM_CHAINS \
