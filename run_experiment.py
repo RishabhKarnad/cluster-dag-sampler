@@ -77,7 +77,7 @@ def evaluate_samples(samples, scores, g_true, theta, Cov, data):
     nll_mean, nll_stddev = compute_nlls(data, samples, theta, Cov)
     logging.info(f'NLL: {nll_mean}+-{nll_stddev}')
 
-    top_dag = samples[np.argmax(list(map(lambda x: x[0][0], scores)))]
+    top_dag = samples[np.argmax(list(map(lambda x: x[0], scores)))]
 
     top_dag_metric = (list(range(len(top_dag[0]))), top_dag[1])
 
