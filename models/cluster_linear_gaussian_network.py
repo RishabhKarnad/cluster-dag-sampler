@@ -18,9 +18,8 @@ def zero_pad(A, k):
 
 
 class ClusterLinearGaussianNetwork:
-    def __init__(self, n_vars, *, mask_covariance=False):
+    def __init__(self, n_vars):
         self.n_vars = n_vars
-        self.mask_covariance = mask_covariance
 
     def fit(self, data, *,
             theta,
@@ -54,7 +53,8 @@ class ClusterLinearGaussianNetwork:
 
         for _ in tqdm(range(max_mle_iters), 'Estimating theta'):
             l = self.loss(data, params['theta'], Covs, Cs, Gs)
-            cb(l.item())
+            if cb is not None:
+                cb(l.item())
             grads = jax.grad(loss_fn)(params)
             updates, opt_state = optimizer.update(grads, opt_state)
             params = optax.apply_updates(params, updates)
@@ -70,12 +70,7 @@ class ClusterLinearGaussianNetwork:
         G_expand = C@G@C.T
         mean_expected = X@(G_expand*theta)
         Cov = get_covariance_for_clustering(C)
-        if self.mask_covariance:
-            G_cov = C@C.T
-            Cov_mask = G_cov*Cov
-            return jnp.mean(stats.multivariate_normal.logpdf(X, mean_expected, Cov_mask))
-        else:
-            return jnp.mean(stats.multivariate_normal.logpdf(X, mean_expected, Cov))
+        return jnp.mean(stats.multivariate_normal.logpdf(X, mean_expected, Cov))
 
     def pmf(self, X, theta, Cov, C, G):
         return jnp.exp(self.logpmf(X, theta, Cov, C, G))

@@ -37,7 +37,7 @@ def clustering_to_matrix(C, k):
     m = np.zeros((n, k))
     for i, C_i in enumerate(C):
         for X_j in C_i:
-            m[X_j, i] = 1
+            m[int(X_j), i] = 1
     return m
 
 
