@@ -47,32 +47,28 @@ class ClusteringProposalDistribution:
         if self.max_clusters > self.k:
             for i in range(self.k-1):
                 self.neighbours.append(f'merge-{i}')
-                last_count = self.neighbour_counts[-1]
-                self.neighbour_counts.append(last_count+1)
+                self.neighbour_counts.append(1)
 
         # Splits
         if self.min_clusters < self.k:
             for i in range(self.k):
                 for c in range(1, len(self.C[i])):
                     self.neighbours.append(f'split-{i}-{c}')
-                    last_count = self.neighbour_counts[-1]
                     self.neighbour_counts.append(
-                        last_count + comb(len(self.C[i]), c))
+                        comb(len(self.C[i]), c))
 
         # Reversals
         for i in range(self.k-1):
             self.neighbours.append(f'reverse-{i}')
-            last_count = self.neighbour_counts[-1]
-            self.neighbour_counts.append(last_count+1)
+            self.neighbour_counts.append(1)
 
         # Exchanges
         for i in range(self.k-1):
             for c1 in range(1, len(self.C[i])+1):
                 for c2 in range(1, len(self.C[i+1])+1):
                     self.neighbours.append(f'exchange-{i}-{c1}-{c2}')
-                    last_count = self.neighbour_counts[-1]
                     self.neighbour_counts.append(
-                        last_count + (comb(len(self.C[i]), c1) * comb(len(self.C[i+1]), c2)))
+                        (comb(len(self.C[i]), c1) * comb(len(self.C[i+1]), c2)))
 
         self.total_neighbours = self.neighbour_counts[-1]
 
@@ -113,13 +109,10 @@ class ClusteringProposalDistribution:
         return neighbour
 
     def sample(self):
-        seed = random_state.get_random_number()
-        j = stats.randint(0, self.total_neighbours).rvs(
-            random_state=seed)
-        for idx in reversed(range(len(self.neighbour_counts))):
-            if j < self.neighbour_counts[idx]:
-                return self.gen_neighbour(self.neighbours[idx])
-        raise RuntimeError('No neighbours were generated')
+        subk = random_state.get_key()
+        j = random.choice(
+            subk, np.arange(len(self.neighbours)), p=np.array(self.neighbour_counts)/len(self.neighbour_counts))
+        return self.gen_neighbour(self.neighbours[j])
 
     def pdf(self, C_star):
         # Uniform probability over neighbours
