@@ -27,7 +27,7 @@
                 "--score",
                 "Bayesian",
                 "--n_data_samples",
-                "100",
+                "10000",
                 "--n_mcmc_samples",
                 "10",
                 "--n_mcmc_warmup",
@@ -43,7 +43,7 @@
                 "--num_chains",
                 "2",
                 "--dataset",
-                "3var",
+                "4var",
                 "--output_path",
                 "./results/debug"
             ]

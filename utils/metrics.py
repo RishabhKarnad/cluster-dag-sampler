@@ -180,6 +180,19 @@ def compute_nlls(data, samples, theta, Cov):
     return np.mean(nlls), np.std(nlls)
 
 
+def compute_mse_theta(G_C, theta, theta_true):
+    C, G = G_C
+    C = clustering_to_matrix(C, len(C))
+    G_expand = C@G@C.T
+    theta_masked = G_expand*theta
+    return np.mean((theta_masked - theta_true)**2)
+
+
+def compute_mse_theta_all(samples, theta, theta_true):
+    mses = [compute_mse_theta(sample, theta, theta_true) for sample in samples]
+    return np.mean(mses), np.std(mses)
+
+
 def faithfulness_score(samples, g_true, *, key):
     group_faithful_model = GroupFaithfulDAG(key)
     count = 0

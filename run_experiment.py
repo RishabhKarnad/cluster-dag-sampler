@@ -1,6 +1,5 @@
 import numpy as np
 import jax.random as random
-import argparse
 from argparse import ArgumentParser
 import matplotlib.pyplot as plt
 import igraph as ig
@@ -8,7 +7,6 @@ from itertools import chain
 
 import os
 import logging
-import csv
 
 from cdag_mcmc_sampler import CDAGSampler
 from data.loader import DataGen
@@ -16,7 +14,7 @@ from models.gaussian import GaussianDistribution
 from scores.cic_score import ScoreCIC
 from scores.bayesian_cdag_score import BayesianCDAGScore
 from models.cluster_linear_gaussian_network import ClusterLinearGaussianNetwork
-from utils.metrics import expected_cluster_shd, expected_shd, expected_metrics, faithfulness_score, compute_nlls, cluster_shd, shd_expanded_graph, metrics_expanded_graph
+from utils.metrics import compute_nlls, compute_mse_theta, compute_mse_theta_all
 from utils.c_dag import stringify_cdag, unstringify_cdag, clustering_to_matrix
 from utils.sys import initialize_logger
 
@@ -55,84 +53,60 @@ def parse_args():
     return args
 
 
-def evaluate_samples(samples, scores, g_true, theta, Cov, data):
-    for i, sample in enumerate(samples):
-        logging.info(f'[Sample {i}]')
-        C, G = sample
-        score_C, score_CIC = scores[i]
-        logging.info(f'    C: {C}')
-        logging.info(f'    G: {G}')
-        logging.info(f'    cluster score: {score_C}')
-        logging.info(f'    graph_score: {score_CIC}')
-    logging.info('=========================')
+def get_graphs_by_count(samples):
+    graph_counts = {}
+    for graph in samples:
+        graph_string = stringify_cdag(graph)
+        if graph_string not in graph_counts:
+            graph_counts[graph_string] = 0
+        graph_counts[graph_string] += 1
+    graphs = sorted(graph_counts, key=graph_counts.get, reverse=True)
+    graph_counts = [graph_counts[g] for g in graphs]
+    graphs = [unstringify_cdag(g) for g in graphs]
+    return graphs, graph_counts
 
-    samples_metric = [(list(map(lambda x: {x}, range(len(G_C[0])))), G_C[1])
-                      for G_C in samples]
 
-    # eshd_vcn, eshd_stddev_vcn, eprc, erec = expected_metrics(
-    #     samples_metric, theta, g_true)
-    # logging.info(
-    #     f'E-SHD (VCN): {eshd_vcn}+-{eshd_stddev_vcn}, E-PRC: {eprc}, E-REC: {erec}')
-
+def evaluate_samples(*, samples, scores, g_true, theta, theta_true, Cov, data, filepath):
     nll_mean, nll_stddev = compute_nlls(data, samples, theta, Cov)
     logging.info(f'NLL: {nll_mean}+-{nll_stddev}')
 
-    top_dag = samples[np.argmax(list(map(lambda x: x[0][0], scores)))]
+    mse_theta_mean, mse_theta_stddev = compute_mse_theta_all(
+        samples, theta, theta_true)
+    logging.info(f'MSE (Theta): {mse_theta_mean}+-{mse_theta_stddev}')
 
-    top_dag_metric = (list(range(len(top_dag[0]))), top_dag[1])
-
+    # Compute metrics for the CDAG with best score
     logging.info('Best DAG metrics:')
+    best_cdag = samples[np.argmax(scores)]
 
-    # shd, prc, rec = metrics_expanded_graph(top_dag_metric, theta, g_true)
-    # logging.info(f'SHD (VCN): {shd}, PRC: {prc}, REC: {rec}')
-
-    C_top, G_top = top_dag
+    C_best, G_best = best_cdag
     m, n = data.shape
-    nll_top = -ClusterLinearGaussianNetwork(n).logpmf(
-        data, theta, Cov, clustering_to_matrix(C_top, len(C_top)), G_top)
-    logging.info(f'NLL: {nll_top}')
+    nll_best = -ClusterLinearGaussianNetwork(n).logpmf(
+        data, theta, Cov, clustering_to_matrix(C_best, len(C_best)), G_best)
+    logging.info(f'\tNLL: {nll_best}')
 
-    graph_counts = {}
-    for graph in samples:
-        graph_string = stringify_cdag(graph)
-        if graph_string not in graph_counts:
-            graph_counts[graph_string] = 0
-        graph_counts[graph_string] += 1
-    graphs = sorted(graph_counts, key=graph_counts.get, reverse=True)
-    graph_counts = [graph_counts[g] for g in graphs]
-    graph_info = list(zip(graphs, graph_counts))
-    logging.info(graph_info[:5])
-    graphs = [unstringify_cdag(g) for g in graphs]
+    mse_theta_best = compute_mse_theta(best_cdag, theta, theta_true)
+    logging.info(f'\tMSE (Theta): {mse_theta_best}')
 
+    # Compute metrics for most frequently sampled CDAG
     logging.info('Most frequent DAG metrics:')
+
+    graphs, graph_counts = get_graphs_by_count(samples)
+    np.save(f'{filepath}/clusterings_by_count.npy',
+            list(map(lambda x: clustering_to_matrix(x[0], len(x[0])), graphs)))
+    np.save(f'{filepath}/graphs_by_count.npy',
+            list(map(lambda x: x[1], graphs)))
+    np.save(f'{filepath}/cdag_counts.npy', graph_counts)
 
     mode_dag = graphs[0]
 
-    mode_dag_metric = (list(range(len(mode_dag[0]))), mode_dag[1])
-
-    logging.info('Most frequent DAG metrics:')
-
-    # shd, prc, rec = metrics_expanded_graph(mode_dag_metric, theta, g_true)
-    # logging.info(f'SHD (VCN): {shd}, PRC: {prc}, REC: {rec}')
-
-    C_top, G_top = mode_dag
+    C_mode, G_mode = mode_dag
     m, n = data.shape
-    nll_top = -ClusterLinearGaussianNetwork(n).logpmf(
-        data, theta, Cov, clustering_to_matrix(C_top, len(C_top)), G_top)
-    logging.info(f'NLL: {nll_top}')
+    nll_mode = -ClusterLinearGaussianNetwork(n).logpmf(
+        data, theta, Cov, clustering_to_matrix(C_mode, len(C_mode)), G_mode)
+    logging.info(f'\tNLL: {nll_mode}')
 
-
-def display_sample_statistics(samples, filepath):
-    graph_counts = {}
-    for graph in samples:
-        graph_string = stringify_cdag(graph)
-        if graph_string not in graph_counts:
-            graph_counts[graph_string] = 0
-        graph_counts[graph_string] += 1
-    graphs = sorted(graph_counts, key=graph_counts.get, reverse=True)
-    graph_counts = [graph_counts[g] for g in graphs]
-    graph_info = list(zip(graphs, graph_counts))
-    logging.info(graph_info[:5])
+    mse_theta_mode = compute_mse_theta(mode_dag, theta, theta_true)
+    logging.info(f'\tMSE (Theta): {mse_theta_mode}')
 
 
 def plot_graph(g, target):
@@ -150,17 +124,7 @@ def plot_graph(g, target):
 
 
 def visualize_graphs(graphs, filename):
-    graph_counts = {}
-    for graph in graphs:
-        graph_string = stringify_cdag(graph)
-        if graph_string not in graph_counts:
-            graph_counts[graph_string] = 0
-        graph_counts[graph_string] += 1
-    graphs = sorted(graph_counts, key=graph_counts.get, reverse=True)
-    graph_counts = [graph_counts[g] for g in graphs]
-    graph_info = list(zip(graphs, graph_counts))
-    logging.info(graph_info[:5])
-    graphs = [unstringify_cdag(g) for g in graphs]
+    graphs, graph_counts = get_graphs_by_count(graphs)
 
     selected_graphs = graphs[:5]
 
@@ -189,7 +153,7 @@ def visualize_graphs(graphs, filename):
 def plot_graph_scores(scores, opt_score, filepath):
     lengths = [len(s) for s in scores]
     scores = list(chain(*scores))
-    scores = list(map(lambda x: x[1].item(), scores))
+    scores = list(map(lambda x: x.item(), scores))
     plt.plot(scores)
     for i, l in enumerate(lengths):
         plt.axvline(l*(i+1), color='green')
@@ -337,12 +301,21 @@ def run(args):
                          scores=cdag_scores[-1],
                          g_true=g_true,
                          theta=theta,
+                         theta_true=theta_true,
                          Cov=Cov_true,
-                         data=data)
-        display_sample_statistics(cdag_samples[-1], filepath=args.output_path)
+                         data=data,
+                         filepath=args.output_path)
+
+        for i in range(len(cdag_samples)):
+            np.save(f'{args.output_path}/em_iter_{i}_clusterings.npy',
+                    list(map(lambda G_C: clustering_to_matrix(G_C[0], len(G_C[0])), cdag_samples[i])))
+            np.save(f'{args.output_path}/em_iter_{i}_graphs.npy',
+                    list(map(lambda G_C: G_C[1], cdag_samples[i])))
+            np.save(f'{args.output_path}/em_iter_{i}_scores.npy',
+                    cdag_scores[i])
 
         for i, graphs in enumerate(cdag_samples):
-            visualize_graphs(graphs, f'{args.output_path}/iter-{i}.png')
+            visualize_graphs(graphs, f'{args.output_path}/em_iter_{i}.png')
 
         if args.score == 'CIC':
             score = ScoreCIC(
@@ -365,13 +338,9 @@ def run(args):
 
         plot_graph_scores(cdag_scores, opt_score, args.output_path)
 
-        logging.info('Estimated theta')
-        logging.info(theta)
+        np.save(f'{args.output_path}/theta_estimated.npy', theta)
 
-        with open(f'{args.output_path}/loss_trace.csv', 'w', newline='') as loss_trace_file:
-            wr = csv.writer(loss_trace_file)
-            loss_trace = list(map(lambda x: [x], loss_trace))
-            wr.writerows(loss_trace)
+        np.save(f'{args.output_path}/loss_trace.npy', loss_trace)
 
         plt.plot(loss_trace)
         plt.savefig(f'{args.output_path}/loss_trace.png')

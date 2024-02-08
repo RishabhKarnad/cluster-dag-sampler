@@ -24,7 +24,7 @@ eps = 1 / 10**256
 log_eps = np.log(eps)
 
 
-class ProposalDistribution:
+class ClusteringProposalDistribution:
     def __init__(self, C, min_clusters, max_clusters):
         self.C = C
         self.k = len(C)
@@ -47,32 +47,28 @@ class ProposalDistribution:
         if self.max_clusters > self.k:
             for i in range(self.k-1):
                 self.neighbours.append(f'merge-{i}')
-                last_count = self.neighbour_counts[-1]
-                self.neighbour_counts.append(last_count+1)
+                self.neighbour_counts.append(1)
 
         # Splits
         if self.min_clusters < self.k:
             for i in range(self.k):
                 for c in range(1, len(self.C[i])):
                     self.neighbours.append(f'split-{i}-{c}')
-                    last_count = self.neighbour_counts[-1]
                     self.neighbour_counts.append(
-                        last_count + comb(len(self.C[i]), c))
+                        comb(len(self.C[i]), c))
 
         # Reversals
         for i in range(self.k-1):
             self.neighbours.append(f'reverse-{i}')
-            last_count = self.neighbour_counts[-1]
-            self.neighbour_counts.append(last_count+1)
+            self.neighbour_counts.append(1)
 
         # Exchanges
         for i in range(self.k-1):
             for c1 in range(1, len(self.C[i])+1):
                 for c2 in range(1, len(self.C[i+1])+1):
                     self.neighbours.append(f'exchange-{i}-{c1}-{c2}')
-                    last_count = self.neighbour_counts[-1]
                     self.neighbour_counts.append(
-                        last_count + (comb(len(self.C[i]), c1) * comb(len(self.C[i+1]), c2)))
+                        (comb(len(self.C[i]), c1) * comb(len(self.C[i+1]), c2)))
 
         self.total_neighbours = self.neighbour_counts[-1]
 
@@ -113,19 +109,45 @@ class ProposalDistribution:
         return neighbour
 
     def sample(self):
-        seed = random_state.get_random_number()
-        j = stats.randint(0, self.total_neighbours).rvs(
-            random_state=seed)
-        for idx in reversed(range(len(self.neighbour_counts))):
-            if j < self.neighbour_counts[idx]:
-                return self.gen_neighbour(self.neighbours[idx])
-        raise RuntimeError('No neighbours were generated')
+        subk = random_state.get_key()
+        j = random.choice(
+            subk, np.arange(len(self.neighbours)), p=np.array(self.neighbour_counts)/len(self.neighbour_counts))
+        return self.gen_neighbour(self.neighbours[j])
 
     def pdf(self, C_star):
         # Uniform probability over neighbours
         return 1 / self.total_neighbours
 
     def logpdf(self, C_star):
+        # Uniform probability over neighbours
+        return -np.log(self.total_neighbours)
+
+
+class GraphProposalDistribution:
+    def __init__(self, G):
+        self.G = G
+        m, m = G.shape
+        self.n_nodes = m
+
+        self.total_neighbours = m*(m-1) / 2
+
+    def sample(self):
+        subk = random_state.get_key()
+        [i, j] = random.choice(subk, np.arange(
+            self.n_nodes), (2,), replace=False)
+
+        if i > j:
+            i, j = j, i
+
+        self.G[i, j] = 1 - self.G[i, j]
+
+        return self.G
+
+    def pdf(self, G_star):
+        # Uniform probability over neighbours
+        return 1 / self.total_neighbours
+
+    def logpdf(self, G_star):
         # Uniform probability over neighbours
         return -np.log(self.total_neighbours)
 
@@ -154,8 +176,6 @@ class CDAGSampler:
 
         self.n_samples = N_SAMPLES
         self.n_warmup = N_WARMUP
-
-        self.ctx = {}
 
         self.theta = None
         self.Cov = None
@@ -188,33 +208,23 @@ class CDAGSampler:
 
         it = tqdm(range(n_warmup), 'MCMC warmup')
         for i in it:
-            K_t, G_t = self.step(
+            C_t, G_t = self.step(
                 cb=lambda K: it.set_postfix_str(f'{len(K)} clusters'))
-            self.samples.append((K_t, G_t))
-            self.scores.append(
-                (self.cluster_score(K_t), self.score((K_t, G_t), self.theta, self.Cov)))
+            self.samples.append((C_t, G_t))
+            self.scores.append(self.cdag_score((C_t, G_t)))
 
         it = tqdm(range(n_samples), 'Sampling with MCMC')
         for i in it:
-            K_t, G_t = self.step(
+            C_t, G_t = self.step(
                 cb=lambda K: it.set_postfix_str(f'{len(K)} clusters'))
-            self.samples.append((K_t, G_t))
-            self.scores.append(
-                (self.cluster_score(K_t), self.score((K_t, G_t), self.theta, self.Cov)))
+            self.samples.append((C_t, G_t))
+            self.scores.append(self.cdag_score((C_t, G_t)))
 
     def get_samples(self):
         return self.samples[-(self.n_samples+1):-1]
 
     def get_scores(self):
         return self.scores[-(self.n_samples+1):-1]
-
-    def make_graph_dist(self, scores):
-        support = len(scores)
-        params = np.array(scores)
-        params -= min(params.min(), 0)
-        params /= params.sum()
-        return stats.rv_discrete(
-            name='categorical', a=0, b=(support), inc=1, values=(np.arange(support), params))
 
     def step(self, cb=None):
         seed = random_state.get_random_number()
@@ -224,68 +234,69 @@ class CDAGSampler:
             # Small probability of staying in same state to make Markov Chain ergodic
             return self.samples[-1]
         else:
-            K_prev, _ = self.samples[-1]
-            K_star = ProposalDistribution(
-                K_prev, self.min_clusters, self.max_clusters).sample()
+            C_prev, G_prev = self.samples[-1]
+
+            C_new, G_new = C_prev, G_prev
+
+            C_star = ClusteringProposalDistribution(
+                C_prev, self.min_clusters, self.max_clusters).sample()
 
             if cb is not None:
-                cb(K_star)
+                cb(C_star)
 
             seed = random_state.get_random_number()
             u = self.U.rvs(random_state=seed)
-            a = self.log_prob_accept(K_star)
+            a = self.log_prob_accept_C(C_star, G_prev)
             if np.log(u) < a:
-                seed = random_state.get_random_number()
-                graph_index = self.make_graph_dist(
-                    self.ctx['graph_scores']).rvs(random_state=seed)
-                graph = self.ctx['graphs'][graph_index]
-                return K_star, graph
+                C_new = C_star
             else:
-                seed = random_state.get_random_number()
-                graph_index = self.make_graph_dist(
-                    self.ctx['prev_graph_scores']).rvs(random_state=seed)
-                graph = self.ctx['prev_graphs'][graph_index]
-                return self.samples[-1][0], graph
+                C_new = C_prev
 
-    def log_prob_accept(self, K_star):
-        K_prev, _ = self.samples[-1]
+            G_star = GraphProposalDistribution(G_prev).sample()
 
-        log_q_K_prev = ProposalDistribution(
-            K_star, self.min_clusters, self.max_clusters).logpdf(K_prev)
-        log_q_K_star = ProposalDistribution(
-            K_prev, self.min_clusters, self.max_clusters).logpdf(K_star)
+            if cb is not None:
+                cb(G_star)
 
-        log_prob_K_star, graphs, graph_scores = self.cluster_score(K_star)
-        log_prob_K_prev, prev_graphs, prev_graph_scores = self.cluster_score(
-            K_prev)
+            seed = random_state.get_random_number()
+            u = self.U.rvs(random_state=seed)
+            a = self.log_prob_accept_G(G_star, C_new)
+            if np.log(u) < a:
+                G_new = G_star
+            else:
+                G_new = G_prev
 
-        self.ctx['graphs'] = graphs
-        self.ctx['prev_graphs'] = prev_graphs
-        self.ctx['graph_scores'] = graph_scores
-        self.ctx['prev_graph_scores'] = prev_graph_scores
+            return C_new, G_new
 
-        rho = ((log_q_K_prev + log_prob_K_star)
-               - (log_q_K_star + log_prob_K_prev))
+    def log_prob_accept_C(self, C_star, G):
+        C_prev, _ = self.samples[-1]
+
+        log_q_C_prev = ClusteringProposalDistribution(
+            C_star, self.min_clusters, self.max_clusters).logpdf(C_prev)
+        log_q_C_star = ClusteringProposalDistribution(
+            C_prev, self.min_clusters, self.max_clusters).logpdf(C_star)
+
+        log_prob_C_star = self.cdag_score((C_star, G))
+        log_prob_C_prev = self.cdag_score((C_prev, G))
+
+        rho = ((log_q_C_prev + log_prob_C_star)
+               - (log_q_C_star + log_prob_C_prev))
 
         return min(0, rho)
 
-    def cluster_score(self, K):
-        graphs = []
-        graph_scores = []
-        for E in self.sample_graphs(K):
-            V = [sorted(K_i) for K_i in K]
-            G_C = (V, E)
-            graph_score = self.graph_score(G_C)
-            graphs.append(E)
-            graph_scores.append(graph_score)
-        score = reduce(np.logaddexp, graph_scores)
-        return score, graphs, graph_scores
+    def log_prob_accept_G(self, G_star, C):
+        _, G_prev = self.samples[-1]
 
-    def sample_graphs(self, K, *, n_samples=None):
-        if n_samples is None:
-            # return UpperTriangular(len(K)).all_graphs()
-            return UpperTriangular(len(K)).all_k_parent_graphs(k=MAX_PARENTS)
-        return UpperTriangular(len(K)).sample_n(n_samples)
+        log_q_G_prev = GraphProposalDistribution(G_star).logpdf(G_prev)
+        log_q_G_star = GraphProposalDistribution(G_prev).logpdf(G_star)
 
-    def graph_score(self, G_C):
-        return self.score(G_C, self.theta, self.Cov) - np.log(count_toposorts(G_C[1]))
+        log_prob_G_star = self.cdag_score((C, G_star))
+        log_prob_G_prev = self.cdag_score((C, G_prev))
+
+        rho = ((log_q_G_prev + log_prob_G_star)
+               - (log_q_G_star + log_prob_G_prev))
+
+        return min(0, rho)
+
+    def cdag_score(self, G_C):
+        # return self.score(G_C, self.theta, self.Cov) - np.log(count_toposorts(G_C[1]))
+        return self.score(G_C, self.theta, self.Cov)
