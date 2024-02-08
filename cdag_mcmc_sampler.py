@@ -231,7 +231,8 @@ class CDAGSampler:
             if cb is not None:
                 cb(K_star)
 
-            u = self.U.rvs()
+            seed = random_state.get_random_number()
+            u = self.U.rvs(random_state=seed)
             a = self.log_prob_accept(K_star)
             if np.log(u) < a:
                 seed = random_state.get_random_number()
