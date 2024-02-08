@@ -1,27 +1,38 @@
+from rng import random_state
+from utils.c_dag import clustering_to_matrix
+from causallearn.utils.cit import CIT
+from tqdm import tqdm
+import scipy.linalg as linalg
+import scipy.stats as stats
+import numpy as np
+from utils.metrics import shd_expanded_graph, metrics_expanded_graph
+import jax.random as random
+from data.loader import DataGen
+from models.gaussian import GaussianDistribution
+from scores.cic_score import ScoreCIC
 from copy import deepcopy
 import matplotlib.pyplot as plt
 from itertools import combinations
+from argparse import ArgumentParser
+import os
+from datetime import datetime
+import logging
+import pandas as pd
 
-import numpy as np
-import scipy.stats as stats
-import scipy.linalg as linalg
-from tqdm import tqdm
-from causallearn.utils.cit import CIT
-
-from utils.c_dag import clustering_to_matrix
+os.environ['CUDA_VISIBLE_DEVICES'] = ''
 
 
-def sample_clustering(n_dims):
-    # k = stats.randint(1, n_dims+1).rvs()
-    k = 3
+def sample_clustering(n_dims, n_clus):
+    k = n_clus
     done = False
     while not done:
         C = [set() for _ in range(k)]
         for i in range(n_dims):
-            cluster = stats.randint(0, k).rvs()
+            seed = random_state.get_random_number()
+            cluster = stats.randint(0, k).rvs(random_state=seed)
             C[cluster].add(i)
         C = list(filter(lambda s: len(s) > 0, C))
-        if len(C) == 3:
+        if len(C) == n_clus:
             done = True
     return C
 
@@ -32,7 +43,8 @@ def sample_cdag(C, rho=0.5):
     B = stats.bernoulli(rho)
     for i in range(k):
         for j in range(i+1, k):
-            E_C[i, j] = B.rvs()
+            seed = random_state.get_random_number()
+            E_C[i, j] = B.rvs(random_state=seed)
     G_C = (C, E_C)
     return G_C
 
@@ -111,15 +123,15 @@ def reorient_v_structures(cdag, data):
     return (C, G_C)
 
 
-def find_cdag(data, *, score, steps=100, rho=0.5, logger, desc):
+def find_cdag(data, *, n_clus, score, steps=100, rho=0.5, logger, desc):
     m, n = data.shape
-    C_star = sample_clustering(n)
+    C_star = sample_clustering(n, n_clus)
     G_star = sample_cdag(C_star, rho)
     score_G = score(G_star)
     scores = []
 
     for i in tqdm(range(steps), desc=desc):
-        C = sample_clustering(n)
+        C = sample_clustering(n, n_clus)
         G_C = sample_cdag(C, rho)
         G_prime = greedy_search(G_C, data, score)
         score_new = score(G_prime)
@@ -156,37 +168,48 @@ def plot_scores(scores, filepath):
     plt.clf()
 
 
+def gen_data(dataset, n_data_samples):
+    datagen = DataGen(0.1)
+    if dataset == '7var':
+        return datagen.generate_group_scm_data(
+            n_samples=n_data_samples, confounded=True)
+    elif dataset == '3var':
+        return datagen.generate_group_scm_data_small_dag(
+            n_samples=n_data_samples)
+    elif dataset == '4var':
+        return datagen.generate_group_scm_data_small_dag_4vars(
+            n_samples=n_data_samples)
+    else:
+        raise RuntimeError('Invalid dataset')
+
+
 def main():
-    import os
-    from datetime import datetime
-    import logging
-    import pandas as pd
-
-    from scores.cic_score import ScoreCIC
-    from models.gaussian import GaussianDistribution
-    from data.loader import DataGen
-    import jax.random as random
-
-    from utils.metrics import shd_expanded_graph, faithfulness_score, metrics_expanded_graph
-
     filepath = f'./results/greedy/{datetime.now().isoformat()}'
     os.makedirs(filepath, exist_ok=True)
     logging.basicConfig(
         filename=f'{filepath}/log.txt', encoding='utf-8', filemode='w', level=logging.INFO)
 
-    key = random.PRNGKey(123)
+    parser = ArgumentParser(prog='Information theoretic greedy C-DAG search',
+                            description='Greedy search algorithm based on CIC score')
+    parser.add_argument('--random_seed', type=int, default=42)
+    parser.add_argument('--n_clusters', type=int, default=2)
+    parser.add_argument('--dataset', type=str,
+                        choices=['3var', '4var', '7var'])
+    args = parser.parse_args()
 
-    # data, (g_true, theta_true, Cov_true, C_true, G_C_true) = DataGen(
-    #     key=key, obs_noise=0.1).generate_data_continuous_5(n_samples=1000)
-    data, (g_true,) = DataGen(
-        key, 0.1).generate_group_scm_data_confounder(n_samples=1000)
+    random_state.set_key(seed=args.random_seed)
+
+    data, scm = gen_data(args)
+
+    (g_true, theta_true, Cov_true, grouping, group_dag) = scm
+
     score_CIC = ScoreCIC(
         data=data, dist=GaussianDistribution)
 
     stats = pd.DataFrame(
-        columns=['run', 'shd', 'precision', 'recall', 'is_faithful'])
+        columns=['run', 'shd', 'precision', 'recall'])
 
-    optimal_score = score_CIC(([{0, 1, 2}, {3, 4}, {5, 6}], g_true))
+    optimal_score = score_CIC((grouping, group_dag))
     logging.info(f'Optimal graph score {optimal_score}')
 
     best_score = None
@@ -194,20 +217,17 @@ def main():
         logging.info(f'RUN {i}')
 
         (C, G_C), graph_score, scores = find_cdag(
-            data, score=score_CIC, steps=1000, logger=logging, desc=f'Run {i}')
+            data, n_clus=args.n_clusters, score=score_CIC, steps=1000, logger=logging, desc=f'Run {i}')
 
         C_dummy = list(map(lambda x: {x}, range(len(C))))
 
         shd = shd_expanded_graph((C_dummy, G_C), None, g_true)
-        is_faithful = faithfulness_score(
-            [(C_dummy, G_C)], g_true, key=key) == 1
         shd_vcn, prc, rec = metrics_expanded_graph(
             (C_dummy, G_C), None, g_true)
 
         logging.info(f'SHD: {shd}')
         logging.info(f'Precision: {prc}')
         logging.info(f'Recall: {rec}')
-        logging.info(f'Is faithful?: {is_faithful}')
         logging.info(f'Score: {graph_score}')
 
         stats = pd.concat([stats, pd.DataFrame([{
@@ -215,7 +235,6 @@ def main():
             'shd': shd,
             'precision': prc,
             'recall': rec,
-            'is_faithful': is_faithful,
             'score': graph_score}])], ignore_index=True)
 
         graphpath = f'{filepath}/run-{i}'
