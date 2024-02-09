@@ -1,4 +1,4 @@
-# Learning Cluster Causal Diagrams using MCMC
+# Learning Cluster Causal Graphs using Markov Chain Monte Carlo
 
 ### Install dependencies
 
