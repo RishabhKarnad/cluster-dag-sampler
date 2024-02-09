@@ -2,17 +2,24 @@
 
 ### Install dependencies
 
+This code has been tested with [Python 3.10.13](https://docs.python.org/3.10/index.html). We recommend using [Conda](https://docs.anaconda.com/free/miniconda/) to manage your python environment for this code.
+
+Install dependencies using the followinf command:
+
 ```sh
 pip install -r requirements.txt
 ```
 
-### Run code
+### Running the sampler
+
+Training and evaluation can be done using the `run` bash script.
 
 ```sh
+chmod u+x ./run
 ./run
 ```
 
-### Options
+#### Options
 
 Edit `run` to modify experiment parameters
 
