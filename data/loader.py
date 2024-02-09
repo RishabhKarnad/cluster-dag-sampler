@@ -8,8 +8,7 @@ import jax.scipy.stats as stats
 from pgmpy.models import LinearGaussianBayesianNetwork
 from pgmpy.factors.continuous import LinearGaussianCPD
 import scipy.sparse as sparse
-import pandas
-import cdt.data
+import pandas as pd
 
 from data.group_faithful import GroupFaithfulDAG
 from utils.c_dag import clustering_to_matrix
@@ -203,23 +202,59 @@ class DataGen:
         Cov_true[2:4, 2:4] = sigma_2
         return X, (G_expand, W, Cov_true, clus, G_C)
 
-    def load_sachs_data(self):
-        data, true_graph = cdt.data.load_dataset('sachs')
+    def get_sachs_data(self,
+                       center: bool = True,
+                       print_labels: bool = False,
+                       normalize=False,
+                       n_data=None,
+                       ):
+        data = pd.read_csv('./sachs_observational.csv')
+        data_out = data.values
+        if center:
+            if normalize:
+                data_out = (data_out - np.mean(data_out, axis=0)) / \
+                    np.std(data_out, axis=0)
+            else:
+                data_out = data_out - np.mean(data_out, axis=0)
 
-        true_graph = nx.adjacency_matrix(true_graph).todense()
+        if self.key != None:
+            self.key, subkey = random.split(self.key)
+            idxs = random.choice(
+                self.key, data_out.shape[0], shape=(n_data,), replace=False)
+            data_out = data_out[idxs]
 
-        return data, (true_graph,)
+        C = [{2, 3, 4}, {0, 1, 5, 6, 7, 8, 9, 10}]
+        G_C = np.array([[0, 0], [0, 0]])
+
+        return data_out, (self.get_sachs_ground_truth(), None, None, C, G_C)
+
+    def get_sachs_ground_truth(self):
+        """Labels are ['praf', 'pmek', 'plcg', 'PIP2', 'PIP3', 'p44/42', 'pakts473',
+        'PKA', 'PKC', 'P38', 'pjnk']."""
+        W = np.load("./sachs_ground_truth.npy")
+        return W
 
     def load_housing_data(self):
-        data = pandas.read_csv(
-            'housing.csv', delim_whitespace=True).to_numpy()
+        df = pd.read_csv(
+            'housing.csv', delim_whitespace=True)
+        df = df.drop(['CHAS'], axis=1)
+        data = df.to_numpy()
 
         true_graph = np.zeros((14, 14))
 
-        true_theta = np.zeros((14, 14))
-        true_cov = np.zeros((14, 14))
+        C = [{3}, {8}, {0}, {6, 7}, {9}, {1}, {4, 5}, {10, 11}, {12}]
 
-        return data, (true_graph, true_theta, true_cov)
+        G_C = np.zeros((9, 9))
+        G_C[0, [2, 3, 5, 6]] = 1
+        G_C[1, [3, 5, 8]] = 1
+        G_C[2, [3, 4, 6, 7]] = 1
+        G_C[3, [4, 5, 7]] = 1
+        G_C[4, 8] = 1
+        G_C[5, 6] = 1
+        G_C[6, [7, 8]] = 1
+        G_C[7, 8] = 1
+
+        return data, (true_graph, None, None, C, G_C)
 
     def viz_graph(adjacency_matrix, graph_lib='igraph'):
         G = nx.from_numpy_array(

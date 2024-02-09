@@ -11,7 +11,7 @@ from functools import reduce
 from models.upper_triangular import UpperTriangular
 
 from utils.sys import debugger_is_active
-from utils.c_dag import matrix_to_clustering, count_toposorts
+from utils.c_dag import matrix_to_clustering, clustering_to_matrix
 
 from rng import random_state
 
@@ -132,6 +132,8 @@ class GraphProposalDistribution:
         self.total_neighbours = m*(m-1) / 2
 
     def sample(self):
+        G = deepcopy(self.G)
+
         subk = random_state.get_key()
         [i, j] = random.choice(subk, np.arange(
             self.n_nodes), (2,), replace=False)
@@ -139,9 +141,9 @@ class GraphProposalDistribution:
         if i > j:
             i, j = j, i
 
-        self.G[i, j] = 1 - self.G[i, j]
+        G[i, j] = 1 - G[i, j]
 
-        return self.G
+        return G
 
     def pdf(self, G_star):
         # Uniform probability over neighbours
@@ -162,12 +164,14 @@ class CDAGSampler:
         self.max_clusters = max_clusters or n
 
         if initial_sample is None:
-            K_init = matrix_to_clustering(
+            C_init = matrix_to_clustering(
                 self.make_random_clustering(self.max_clusters))
-            G_init = UpperTriangular(len(K_init)).sample()
-            initial_sample = (K_init, G_init)
+            G_init = UpperTriangular(len(C_init)).sample()
+            initial_sample = (C_init, G_init)
 
         self.samples = [initial_sample]
+        self.C_proposed = []
+        self.G_proposed = []
         self.U = stats.uniform(0, 1)
 
         self.data = data
@@ -182,9 +186,11 @@ class CDAGSampler:
 
         self.debug = debugger_is_active()
 
-    def _reset(self, K_init, G_init):
-        self.samples = [(K_init, G_init)]
+    def _reset(self, C_init, G_init):
+        self.samples = [(C_init, G_init)]
         self.scores = []
+        self.C_proposed = []
+        self.G_proposed = []
 
     def set_parameters(self, theta, Cov):
         self.theta = theta
@@ -240,6 +246,7 @@ class CDAGSampler:
 
             C_star = ClusteringProposalDistribution(
                 C_prev, self.min_clusters, self.max_clusters).sample()
+            self.C_proposed.append(clustering_to_matrix(C_star, k=len(C_star)))
 
             if cb is not None:
                 cb(C_star)
@@ -253,6 +260,7 @@ class CDAGSampler:
                 C_new = C_prev
 
             G_star = GraphProposalDistribution(G_prev).sample()
+            self.G_proposed.append(G_star)
 
             if cb is not None:
                 cb(G_star)

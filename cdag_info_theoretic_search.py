@@ -19,8 +19,6 @@ from datetime import datetime
 import logging
 import pandas as pd
 
-os.environ['CUDA_VISIBLE_DEVICES'] = ''
-
 
 def sample_clustering(n_dims, n_clus):
     k = n_clus
@@ -150,7 +148,7 @@ def find_cdag(data, *, n_clus, score, steps=100, rho=0.5, logger, desc):
 
     G_star = reorient_v_structures(G_star, data)
 
-    return G_prime, score_G, scores
+    return G_star, score_G, scores
 
 
 def visualize_cdag(C, G_C, filepath):
@@ -193,13 +191,14 @@ def main():
                             description='Greedy search algorithm based on CIC score')
     parser.add_argument('--random_seed', type=int, default=42)
     parser.add_argument('--n_clusters', type=int, default=2)
+    parser.add_argument('--n_data_samples', type=int, default=10000)
     parser.add_argument('--dataset', type=str,
                         choices=['3var', '4var', '7var'])
     args = parser.parse_args()
 
     random_state.set_key(seed=args.random_seed)
 
-    data, scm = gen_data(args)
+    data, scm = gen_data(args.dataset, args.n_data_samples)
 
     (g_true, theta_true, Cov_true, grouping, group_dag) = scm
 
@@ -221,20 +220,20 @@ def main():
 
         C_dummy = list(map(lambda x: {x}, range(len(C))))
 
-        shd = shd_expanded_graph((C_dummy, G_C), None, g_true)
-        shd_vcn, prc, rec = metrics_expanded_graph(
-            (C_dummy, G_C), None, g_true)
+        # shd = shd_expanded_graph((C_dummy, G_C), None, g_true)
+        # shd_vcn, prc, rec = metrics_expanded_graph(
+        #     (C_dummy, G_C), None, g_true)
 
-        logging.info(f'SHD: {shd}')
-        logging.info(f'Precision: {prc}')
-        logging.info(f'Recall: {rec}')
+        # logging.info(f'SHD: {shd}')
+        # logging.info(f'Precision: {prc}')
+        # logging.info(f'Recall: {rec}')
         logging.info(f'Score: {graph_score}')
 
         stats = pd.concat([stats, pd.DataFrame([{
             'run': i,
-            'shd': shd,
-            'precision': prc,
-            'recall': rec,
+            # 'shd': shd,
+            # 'precision': prc,
+            # 'recall': rec,
             'score': graph_score}])], ignore_index=True)
 
         graphpath = f'{filepath}/run-{i}'

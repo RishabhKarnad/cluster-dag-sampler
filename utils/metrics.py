@@ -123,7 +123,7 @@ def cluster_shd(g_true, g_c):
 
     g_c_true = get_cdag(clusters=g_c[0], adj=g_true)
 
-    return SHD(essential_graph(g_c_true[1]), essential_graph(g_c[1]))
+    return shd_vcn(essential_graph(g_c_true[1]), essential_graph(g_c[1]))['shd']
 
 
 def expected_cluster_shd(g_true, graphs):
@@ -141,7 +141,7 @@ def shd_expanded_graph(cdag, theta, true_dag):
 
     true_dag = true_dag*G_expand
 
-    return SHD(G, np.array(true_dag))
+    return shd_vcn(G, np.array(true_dag))['shd']
 
 
 def metrics_expanded_graph(cdag, theta, true_dag):
