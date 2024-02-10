@@ -7,12 +7,12 @@ mkdir -p results/$DIR/bayesian/4var
 mkdir -p results/$DIR/bayesian/7var
 
 
-N_DATA_SAMPLES=10000
+N_DATA_SAMPLES=1000
 N_MCMC_SAMPLES=1000
 N_MCMC_WARMUP=250
 MAX_EM_ITERS=5
 MAX_MLE_ITERS=1000
-NUM_CHAINS=20
+NUM_CHAINS=10
 
 
 python run_experiment.py \
@@ -54,3 +54,28 @@ python run_experiment.py \
     --dataset '7var' \
     --output_path results/$DIR/bayesian/7var
 
+python run_experiment.py \
+    --score 'Bayesian' \
+    --n_data_samples $N_DATA_SAMPLES \
+    --n_mcmc_samples $N_MCMC_SAMPLES \
+    --n_mcmc_warmup $N_MCMC_WARMUP \
+    --max_em_iters $MAX_EM_ITERS \
+    --max_mle_iters $MAX_MLE_ITERS \
+    --min_clusters 2 \
+    --max_clusters 2 \
+    --num_chains $NUM_CHAINS \
+    --dataset 'sachs' \
+    --output_path results/$DIR/bayesian/sachs
+
+python run_experiment.py \
+    --score 'Bayesian' \
+    --n_data_samples $N_DATA_SAMPLES \
+    --n_mcmc_samples $N_MCMC_SAMPLES \
+    --n_mcmc_warmup $N_MCMC_WARMUP \
+    --max_em_iters $MAX_EM_ITERS \
+    --max_mle_iters $MAX_MLE_ITERS \
+    --min_clusters 9 \
+    --max_clusters 9 \
+    --num_chains $NUM_CHAINS \
+    --dataset 'housing' \
+    --output_path results/$DIR/bayesian/housing

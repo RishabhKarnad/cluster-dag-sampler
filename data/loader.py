@@ -205,10 +205,10 @@ class DataGen:
     def get_sachs_data(self,
                        center: bool = True,
                        print_labels: bool = False,
-                       normalize=False,
-                       n_data=None,
+                       normalize=True,
+                       n_data=853,
                        ):
-        data = pd.read_csv('./sachs_observational.csv')
+        data = pd.read_csv('./data/sachs_observational.csv')
         data_out = data.values
         if center:
             if normalize:
@@ -217,11 +217,10 @@ class DataGen:
             else:
                 data_out = data_out - np.mean(data_out, axis=0)
 
-        if self.key != None:
-            self.key, subkey = random.split(self.key)
-            idxs = random.choice(
-                self.key, data_out.shape[0], shape=(n_data,), replace=False)
-            data_out = data_out[idxs]
+        # self.key, subkey = random.split(self.key)
+        # idxs = random.choice(
+        #     self.key, data_out.shape[0], shape=(n_data,), replace=False)
+        # data_out = data_out[idxs]
 
         C = [{2, 3, 4}, {0, 1, 5, 6, 7, 8, 9, 10}]
         G_C = np.array([[0, 0], [0, 0]])
@@ -231,12 +230,12 @@ class DataGen:
     def get_sachs_ground_truth(self):
         """Labels are ['praf', 'pmek', 'plcg', 'PIP2', 'PIP3', 'p44/42', 'pakts473',
         'PKA', 'PKC', 'P38', 'pjnk']."""
-        W = np.load("./sachs_ground_truth.npy")
+        W = np.load("./data/sachs_ground_truth.npy")
         return W
 
     def load_housing_data(self):
         df = pd.read_csv(
-            'housing.csv', delim_whitespace=True)
+            './data/housing.csv', delim_whitespace=True)
         df = df.drop(['CHAS'], axis=1)
         data = df.to_numpy()
 

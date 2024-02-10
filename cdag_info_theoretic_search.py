@@ -177,24 +177,31 @@ def gen_data(dataset, n_data_samples):
     elif dataset == '4var':
         return datagen.generate_group_scm_data_small_dag_4vars(
             n_samples=n_data_samples)
+    elif dataset == 'sachs':
+        return datagen.get_sachs_data()
+    elif dataset == 'housing':
+        return datagen.load_housing_data()
     else:
         raise RuntimeError('Invalid dataset')
 
 
 def main():
-    filepath = f'./results/greedy/{datetime.now().isoformat()}'
-    os.makedirs(filepath, exist_ok=True)
-    logging.basicConfig(
-        filename=f'{filepath}/log.txt', encoding='utf-8', filemode='w', level=logging.INFO)
-
     parser = ArgumentParser(prog='Information theoretic greedy C-DAG search',
                             description='Greedy search algorithm based on CIC score')
     parser.add_argument('--random_seed', type=int, default=42)
     parser.add_argument('--n_clusters', type=int, default=2)
     parser.add_argument('--n_data_samples', type=int, default=10000)
     parser.add_argument('--dataset', type=str,
-                        choices=['3var', '4var', '7var'])
+                        choices=['3var', '4var', '7var', 'sachs', 'housing'])
+    parser.add_argument('--n_runs', type=int, default=20)
+    parser.add_argument('--n_iters', type=int, default=1000)
+    parser.add_argument('--output_path', type=str)
     args = parser.parse_args()
+
+    filepath = f'./{args.output_path or "results/greedy"}/{datetime.now().isoformat()}'
+    os.makedirs(filepath, exist_ok=True)
+    logging.basicConfig(
+        filename=f'{filepath}/log.txt', encoding='utf-8', filemode='w', level=logging.INFO)
 
     random_state.set_key(seed=args.random_seed)
 
@@ -212,11 +219,11 @@ def main():
     logging.info(f'Optimal graph score {optimal_score}')
 
     best_score = None
-    for i in range(20):
+    for i in range(args.n_runs):
         logging.info(f'RUN {i}')
 
         (C, G_C), graph_score, scores = find_cdag(
-            data, n_clus=args.n_clusters, score=score_CIC, steps=1000, logger=logging, desc=f'Run {i}')
+            data, n_clus=args.n_clusters, score=score_CIC, steps=args.n_iters, logger=logging, desc=f'Run {i}')
 
         C_dummy = list(map(lambda x: {x}, range(len(C))))
 

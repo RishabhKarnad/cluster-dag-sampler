@@ -33,6 +33,8 @@ def parse_args():
         '3var',
         '4var',
         '7var',
+        'sachs',
+        'housing',
     ])
 
     parser.add_argument('--n_data_samples', type=int)
@@ -157,7 +159,8 @@ def plot_graph_scores(scores, opt_score, filepath):
     plt.plot(scores)
     for i, l in enumerate(lengths):
         plt.axvline(l*(i+1), color='green')
-    plt.axhline(opt_score, color='red', linestyle=':')
+    if opt_score is not None:
+        plt.axhline(opt_score, color='red', linestyle=':')
     plt.savefig(f'{filepath}/scores.png')
     plt.clf()
 
@@ -235,6 +238,10 @@ def gen_data(args):
     elif args.dataset == '4var':
         return datagen.generate_group_scm_data_small_dag_4vars(
             n_samples=args.n_data_samples)
+    elif args.dataset == 'sachs':
+        return datagen.get_sachs_data()
+    elif args.dataset == 'housing':
+        return datagen.load_housing_data()
     else:
         raise RuntimeError('Invalid dataset')
 
@@ -257,13 +264,19 @@ def run(args):
     logging.info(grouping)
     logging.info('Group DAG')
     logging.info(group_dag)
-    logging.info('True theta')
-    logging.info(theta_true)
-    logging.info('True covariance')
-    logging.info(Cov_true)
-    logging.info('Ground truth NLL')
-    logging.info(-ClusterLinearGaussianNetwork(n).logpmf(data,
-                 theta_true, Cov_true, clustering_to_matrix(grouping, len(grouping)), group_dag))
+
+    if theta_true is not None:
+        logging.info('True theta')
+        logging.info(theta_true)
+        logging.info('True covariance')
+        logging.info(Cov_true)
+        logging.info('Ground truth NLL')
+        logging.info(-ClusterLinearGaussianNetwork(n).logpmf(data,
+                                                             theta_true,
+                                                             Cov_true,
+                                                             clustering_to_matrix(
+                                                                 grouping, len(grouping)),
+                                                             group_dag))
     logging.info(
         '============================================================')
 
@@ -301,14 +314,15 @@ def run(args):
                                                                                        args.min_clusters,
                                                                                        args.max_clusters)
 
-        evaluate_samples(samples=cdag_samples[-1],
-                         scores=cdag_scores[-1],
-                         g_true=g_true,
-                         theta=theta,
-                         theta_true=theta_true,
-                         Cov=Cov_true,
-                         data=data,
-                         filepath=args.output_path)
+        if theta_true is not None:
+            evaluate_samples(samples=cdag_samples[-1],
+                             scores=cdag_scores[-1],
+                             g_true=g_true,
+                             theta=theta,
+                             theta_true=theta_true,
+                             Cov=Cov_true,
+                             data=data,
+                             filepath=args.output_path)
 
         for i in range(len(cdag_samples)):
             np.save(f'{args.output_path}/em_iter_{i}_clusterings.npy',
@@ -325,24 +339,27 @@ def run(args):
         for i, graphs in enumerate(cdag_samples):
             visualize_graphs(graphs, f'{args.output_path}/em_iter_{i}.png')
 
-        if args.score == 'CIC':
-            score = ScoreCIC(
-                data=data,
-                dist=GaussianDistribution,
-                parameters={
-                    'mean': np.array((data@theta_true).mean(axis=0)),
-                    'cov': Cov_true,
-                })
-        elif args.score == 'Bayesian':
-            score = BayesianCDAGScore(data=data,
-                                      min_clusters=args.min_clusters,
-                                      mean_clusters=args.max_clusters,
-                                      max_clusters=args.max_clusters)
+        if theta_true is not None:
+            if args.score == 'CIC':
+                score = ScoreCIC(
+                    data=data,
+                    dist=GaussianDistribution,
+                    parameters={
+                        'mean': np.array((data@theta_true).mean(axis=0)),
+                        'cov': Cov_true,
+                    })
+            elif args.score == 'Bayesian':
+                score = BayesianCDAGScore(data=data,
+                                          min_clusters=args.min_clusters,
+                                          mean_clusters=args.max_clusters,
+                                          max_clusters=args.max_clusters)
 
-        opt_cdag = (grouping, group_dag)
-        opt_score = score(opt_cdag,
-                          theta=theta_true*g_true,
-                          Cov=Cov_true)
+            opt_cdag = (grouping, group_dag)
+            opt_score = score(opt_cdag,
+                              theta=theta_true*g_true,
+                              Cov=Cov_true)
+        else:
+            opt_score = None
 
         plot_graph_scores(cdag_scores, opt_score, args.output_path)
 

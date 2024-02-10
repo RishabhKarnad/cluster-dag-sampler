@@ -1,6 +1,5 @@
 import numpy as np
 
-from cdt.metrics import SHD
 import networkx as nx
 
 from data.group_faithful import GroupFaithfulDAG
