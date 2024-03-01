@@ -30,6 +30,7 @@ def parse_args():
     parser.add_argument('--score', type=str, choices=['CIC', 'Bayesian'])
 
     parser.add_argument('--dataset', type=str, choices=[
+        'full7var',
         '3var',
         '4var',
         '7var',
@@ -68,8 +69,8 @@ def get_graphs_by_count(samples):
     return graphs, graph_counts
 
 
-def evaluate_samples(*, samples, scores, g_true, theta, theta_true, Cov, data, filepath):
-    nll_mean, nll_stddev = compute_nlls(data, samples, theta, Cov)
+def evaluate_samples(*, samples, scores, theta, theta_true, data, filepath):
+    nll_mean, nll_stddev = compute_nlls(data, samples, theta)
     logging.info(f'NLL: {nll_mean}+-{nll_stddev}')
 
     mse_theta_mean, mse_theta_stddev = compute_mse_theta_all(
@@ -83,7 +84,7 @@ def evaluate_samples(*, samples, scores, g_true, theta, theta_true, Cov, data, f
     C_best, G_best = best_cdag
     m, n = data.shape
     nll_best = -ClusterLinearGaussianNetwork(n).logpmf(
-        data, theta, Cov, clustering_to_matrix(C_best, len(C_best)), G_best)
+        data, theta, clustering_to_matrix(C_best, len(C_best)), G_best)
     logging.info(f'\tNLL: {nll_best}')
 
     mse_theta_best = compute_mse_theta(best_cdag, theta, theta_true)
@@ -104,7 +105,7 @@ def evaluate_samples(*, samples, scores, g_true, theta, theta_true, Cov, data, f
     C_mode, G_mode = mode_dag
     m, n = data.shape
     nll_mode = -ClusterLinearGaussianNetwork(n).logpmf(
-        data, theta, Cov, clustering_to_matrix(C_mode, len(C_mode)), G_mode)
+        data, theta, clustering_to_matrix(C_mode, len(C_mode)), G_mode)
     logging.info(f'\tNLL: {nll_mode}')
 
     mse_theta_mode = compute_mse_theta(mode_dag, theta, theta_true)
@@ -232,6 +233,8 @@ def gen_data(args):
     if args.dataset == '7var':
         return datagen.generate_group_scm_data(
             n_samples=args.n_data_samples, confounded=True)
+    elif args.dataset == 'full7var':
+        return datagen.generate_scm_data(n_samples=args.n_data_samples)
     elif args.dataset == '3var':
         return datagen.generate_group_scm_data_small_dag(
             n_samples=args.n_data_samples)
@@ -273,7 +276,6 @@ def run(args):
         logging.info('Ground truth NLL')
         logging.info(-ClusterLinearGaussianNetwork(n).logpmf(data,
                                                              theta_true,
-                                                             Cov_true,
                                                              clustering_to_matrix(
                                                                  grouping, len(grouping)),
                                                              group_dag))
@@ -355,9 +357,7 @@ def run(args):
                                           max_clusters=args.max_clusters)
 
             opt_cdag = (grouping, group_dag)
-            opt_score = score(opt_cdag,
-                              theta=theta_true*g_true,
-                              Cov=Cov_true)
+            opt_score = score(opt_cdag, theta=theta_true*g_true)
         else:
             opt_score = None
 

@@ -23,7 +23,6 @@ class ClusterLinearGaussianNetwork:
 
     def fit(self, data, *,
             theta,
-            Cov,
             max_mle_iters=100,
             mle_step_size=0.01,
             samples,
@@ -63,14 +62,14 @@ class ClusterLinearGaussianNetwork:
         self.cdag_samples = samples
         self.cdag_scores = scores
 
-    def loss(self, X, theta, Covs, Cs, Gs):
-        return -jnp.mean(jax.vmap(self.logpmf, (None, None, 0, 0, 0), 0)(X, theta, Covs, Cs, Gs))
+    def loss(self, X, theta, Cs, Gs):
+        return -jnp.mean(jax.vmap(self.logpmf, (None, None, 0, 0), 0)(X, theta, Cs, Gs))
 
-    def logpmf(self, X, theta, Cov_, C, G):
+    def logpmf(self, X, theta, C, G):
         G_expand = C@G@C.T
         mean_expected = X@(G_expand*theta)
         Cov = get_covariance_for_clustering(C)
         return jnp.mean(stats.multivariate_normal.logpdf(X, mean_expected, Cov))
 
-    def pmf(self, X, theta, Cov, C, G):
-        return jnp.exp(self.logpmf(X, theta, Cov, C, G))
+    def pmf(self, X, theta, C, G):
+        return jnp.exp(self.logpmf(X, theta, C, G))

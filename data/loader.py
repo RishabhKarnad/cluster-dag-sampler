@@ -22,6 +22,36 @@ class DataGen:
         self.adjacency_matrix = None
         self.theta = None
 
+    def generate_scm_data(self, n_samples=100):
+        G = np.array([[0.,  0.,  0., 1., 1.,  0.,  0.],
+                      [0.,  0.,  0., 1.,  1.,  0.,  0.],
+                      [0.,  0.,  0.,  1., 1.,  0.,  0.],
+                      [0.,  0.,  0.,  0.,  0.,  0.,  0.],
+                      [0.,  0.,  0.,  0.,  0.,  0.,  0.],
+                      [0.,  0.,  0., 1.,  1.,  0.,  0.],
+                      [0.,  0.,  0., 1.,  1.,  0.,  0.]])
+
+        theta = np.array([[0.,  0.,  0., -7., 12.,  0.,  0.],
+                          [0.,  0.,  0., 10.,  2.,  0.,  0.],
+                          [0.,  0.,  0.,  9., -4.,  0.,  0.],
+                          [0.,  0.,  0.,  0.,  0.,  0.,  0.],
+                          [0.,  0.,  0.,  0.,  0.,  0.,  0.],
+                          [0.,  0.,  0., 26.,  4.,  0.,  0.],
+                          [0.,  0.,  0., -15.,  2.,  0.,  0.]])
+
+        mu = np.zeros(7)
+        sigma = self.obs_noise*np.eye(7)
+
+        subkey = random_state.get_key()
+        Z = random.multivariate_normal(
+            subkey, mu, sigma, shape=(n_samples,))
+
+        W = theta * G
+
+        X = Z @ np.linalg.inv(np.eye(7) - W)
+
+        return X, (G, theta, sigma, [{0}, {1}, {2}, {3}, {4}, {5}, {6}], G)
+
     def generate_group_scm_data(self, n_samples=100, *,
                                 vstruct=True, confounded=True, zero_centered=True):
         clus = [{0, 1, 2}, {3, 4}, {5, 6}]
@@ -93,13 +123,39 @@ class DataGen:
         Z_1 = random.multivariate_normal(
             subkey, mu_1, sigma_1, shape=(n_samples,))
 
+        # subkey = random_state.get_key()
+        # f1 = random.exponential(subkey, shape=(n_samples,))
+        # subkey = random_state.get_key()
+        # z1 = random.exponential(subkey, shape=(n_samples,)) + f1
+        # subkey = random_state.get_key()
+        # z2 = random.exponential(subkey, shape=(n_samples,)) + f1
+        # subkey = random_state.get_key()
+        # z3 = random.exponential(subkey, shape=(n_samples,)) + f1
+        # Z_1 = jnp.vstack([z1, z2, z3]).T
+
         subkey = random_state.get_key()
         Z_2 = random.multivariate_normal(
             subkey, mu_2, sigma_2, shape=(n_samples,))
 
+        # subkey = random_state.get_key()
+        # f2 = random.exponential(subkey, shape=(n_samples,))
+        # subkey = random_state.get_key()
+        # z4 = random.exponential(subkey, shape=(n_samples,)) + f2
+        # subkey = random_state.get_key()
+        # z5 = random.exponential(subkey, shape=(n_samples,)) + f2
+        # Z_2 = jnp.vstack([z4, z5]).T
+
         subkey = random_state.get_key()
         Z_3 = random.multivariate_normal(
             subkey, mu_3, sigma_3, shape=(n_samples,))
+
+        # subkey = random_state.get_key()
+        # f3 = random.exponential(subkey, shape=(n_samples,))
+        # subkey = random_state.get_key()
+        # z6 = random.exponential(subkey, shape=(n_samples,)) + f3
+        # subkey = random_state.get_key()
+        # z7 = random.exponential(subkey, shape=(n_samples,)) + f3
+        # Z_3 = jnp.vstack([z6, z7]).T
 
         Z = np.hstack([Z_1, Z_2, Z_3])
 
@@ -209,6 +265,7 @@ class DataGen:
                        n_data=853,
                        ):
         data = pd.read_csv('./data/sachs_observational.csv')
+        data = data.drop(columns=['PIP3', 'PKC'])
         data_out = data.values
         if center:
             if normalize:
@@ -222,8 +279,14 @@ class DataGen:
         #     self.key, data_out.shape[0], shape=(n_data,), replace=False)
         # data_out = data_out[idxs]
 
-        C = [{2, 3, 4}, {0, 1, 5, 6, 7, 8, 9, 10}]
-        G_C = np.array([[0, 0], [0, 0]])
+        # C = [{2, 3, 4}, {0, 1, 5, 6, 7, 8, 9, 10}]
+        # G_C = np.array([[0, 0], [0, 0]])
+
+        C = [{5, 2, 3}, {6}, {7, 8, 0, 1}, {4}]
+        G_C = np.array([[0, 0, 1, 0],
+                        [1, 0, 1, 1],
+                        [0, 0, 0, 1],
+                        [0, 0, 0, 0]])
 
         return data_out, (self.get_sachs_ground_truth(), None, None, C, G_C)
 

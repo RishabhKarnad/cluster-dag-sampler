@@ -182,7 +182,6 @@ class CDAGSampler:
         self.n_warmup = N_WARMUP
 
         self.theta = None
-        self.Cov = None
 
         self.debug = debugger_is_active()
 
@@ -194,7 +193,6 @@ class CDAGSampler:
 
     def set_parameters(self, theta, Cov):
         self.theta = theta
-        self.Cov = Cov
 
     def make_random_clustering(self, n_clusters):
         done = False
@@ -306,5 +304,4 @@ class CDAGSampler:
         return min(0, rho)
 
     def cdag_score(self, G_C):
-        # return self.score(G_C, self.theta, self.Cov) - np.log(count_toposorts(G_C[1]))
-        return self.score(G_C, self.theta, self.Cov)
+        return self.score(G_C, self.theta)

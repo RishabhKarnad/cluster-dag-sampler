@@ -171,10 +171,10 @@ def expected_metrics(cdags, theta, true_dag):
     return np.mean(shds), np.std(shds), np.mean(prcs), np.mean(recs)
 
 
-def compute_nlls(data, samples, theta, Cov):
+def compute_nlls(data, samples, theta):
     n, n = theta.shape
     clgn = ClusterLinearGaussianNetwork(n)
-    nlls = [-clgn.logpmf(data, theta, Cov, clustering_to_matrix(C, len(C)), G)
+    nlls = [-clgn.logpmf(data, theta, clustering_to_matrix(C, len(C)), G)
             for (C, G) in samples]
     return np.mean(nlls), np.std(nlls)
 
