@@ -214,7 +214,6 @@ def train(data, init_params, score_type, max_em_iters, n_mcmc_samples, n_mcmc_wa
 
         clgn.fit(data,
                  theta=theta,
-                 Cov=Cov,
                  max_mle_iters=args.max_mle_iters,
                  samples=samples_i,
                  scores=scores_i,
@@ -319,10 +318,8 @@ def run(args):
         if theta_true is not None:
             evaluate_samples(samples=cdag_samples[-1],
                              scores=cdag_scores[-1],
-                             g_true=g_true,
                              theta=theta,
                              theta_true=theta_true,
-                             Cov=Cov_true,
                              data=data,
                              filepath=args.output_path)
 

@@ -45,13 +45,11 @@ class ClusterLinearGaussianNetwork:
         optimizer = optax.adam(mle_step_size)
         opt_state = optimizer.init(params)
 
-        Covs = jax.vmap(get_covariance_for_clustering, (0), 0)(Cs)
-
         def loss_fn(params):
-            return self.loss(data, params['theta'], Covs, Cs, Gs)
+            return self.loss(data, params['theta'], Cs, Gs)
 
         for _ in tqdm(range(max_mle_iters), 'Estimating theta'):
-            l = self.loss(data, params['theta'], Covs, Cs, Gs)
+            l = self.loss(data, params['theta'], Cs, Gs)
             if cb is not None:
                 cb(l.item())
             grads = jax.grad(loss_fn)(params)
