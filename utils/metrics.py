@@ -7,7 +7,7 @@ from models.cluster_linear_gaussian_network import ClusterLinearGaussianNetwork
 from utils.c_dag import clustering_to_matrix
 
 
-def shd_vcn(B_est, B_true):
+def compute_metrics(B_est, B_true):
     """Compute various accuracy metrics for B_est.
 
     true positive = predicted association exists in condition in correct direction
@@ -122,7 +122,7 @@ def cluster_shd(g_true, g_c):
 
     g_c_true = get_cdag(clusters=g_c[0], adj=g_true)
 
-    return shd_vcn(essential_graph(g_c_true[1]), essential_graph(g_c[1]))['shd']
+    return compute_metrics(essential_graph(g_c_true[1]), essential_graph(g_c[1]))['shd']
 
 
 def expected_cluster_shd(g_true, graphs):
@@ -140,7 +140,7 @@ def shd_expanded_graph(cdag, theta, true_dag):
 
     true_dag = true_dag*G_expand
 
-    return shd_vcn(G, np.array(true_dag))['shd']
+    return compute_metrics(G, np.array(true_dag))['shd']
 
 
 def metrics_expanded_graph(cdag, theta, true_dag):
@@ -153,7 +153,7 @@ def metrics_expanded_graph(cdag, theta, true_dag):
 
     true_dag = true_dag*G_expand
 
-    vcn_stats = shd_vcn(G, true_dag)
+    vcn_stats = compute_metrics(G, true_dag)
 
     return vcn_stats['shd'], vcn_stats['prc'], vcn_stats['rec']
 
@@ -205,24 +205,3 @@ def faithfulness_score(samples, g_true, *, key):
             count += 1
 
     return count / len(samples)
-
-
-def test():
-    a = np.array([[0, 1, 1, 0, 0, 0],
-                  [0, 0, 0, 1, 0, 0],
-                  [0, 0, 0, 0, 0, 0],
-                  [0, 0, 0, 0, 1, 0],
-                  [0, 0, 0, 0, 0, 1],
-                  [0, 0, 0, 0, 0, 0]])
-
-    clusters = [(0, 1), (2,), (3, 4, 5)]
-    edges = np.array([[0, 1, 1],
-                      [0, 0, 0],
-                      [0, 0, 0]])
-    cdag = (clusters, edges)
-
-    print(cluster_shd(a, cdag))
-
-
-if __name__ == '__main__':
-    test()

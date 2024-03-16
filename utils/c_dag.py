@@ -69,14 +69,14 @@ def count_toposorts(M):
     return len(toposorts)
 
 
-def test():
-    cdag = ([{1, 4, 3}, {5, 2}, {0, 14}], np.array(
-        [[0,  0, 0], [0, 0, 1], [0, 0, 0]]))
-    stringified = stringify_cdag(cdag)
-    unstringified = unstringify_cdag(stringified)
-
-
-if __name__ == '__main__':
-    from permutation import make_permutation_matrix
-
-    test()
+def get_graphs_by_count(samples):
+    graph_counts = {}
+    for graph in samples:
+        graph_string = stringify_cdag(graph)
+        if graph_string not in graph_counts:
+            graph_counts[graph_string] = 0
+        graph_counts[graph_string] += 1
+    graphs = sorted(graph_counts, key=graph_counts.get, reverse=True)
+    graph_counts = [graph_counts[g] for g in graphs]
+    graphs = [unstringify_cdag(g) for g in graphs]
+    return graphs, graph_counts

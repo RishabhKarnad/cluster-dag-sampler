@@ -2,8 +2,6 @@ import numpy as np
 import jax.random as random
 from argparse import ArgumentParser
 import matplotlib.pyplot as plt
-import igraph as ig
-from itertools import chain
 
 import os
 import logging
@@ -15,7 +13,8 @@ from scores.cic_score import ScoreCIC
 from scores.bayesian_cdag_score import BayesianCDAGScore
 from models.cluster_linear_gaussian_network import ClusterLinearGaussianNetwork
 from utils.metrics import compute_nlls, compute_mse_theta, compute_mse_theta_all
-from utils.c_dag import stringify_cdag, unstringify_cdag, clustering_to_matrix
+from utils.c_dag import clustering_to_matrix, get_graphs_by_count
+from utils.visualization import visualize_graphs, plot_graph_scores
 from utils.sys import initialize_logger
 
 from rng import random_state
@@ -54,19 +53,6 @@ def parse_args():
     args = parser.parse_args()
 
     return args
-
-
-def get_graphs_by_count(samples):
-    graph_counts = {}
-    for graph in samples:
-        graph_string = stringify_cdag(graph)
-        if graph_string not in graph_counts:
-            graph_counts[graph_string] = 0
-        graph_counts[graph_string] += 1
-    graphs = sorted(graph_counts, key=graph_counts.get, reverse=True)
-    graph_counts = [graph_counts[g] for g in graphs]
-    graphs = [unstringify_cdag(g) for g in graphs]
-    return graphs, graph_counts
 
 
 def evaluate_samples(*, samples, scores, theta, theta_true, data, filepath):
@@ -110,60 +96,6 @@ def evaluate_samples(*, samples, scores, theta, theta_true, data, filepath):
 
     mse_theta_mode = compute_mse_theta(mode_dag, theta, theta_true)
     logging.info(f'\tMSE (Theta): {mse_theta_mode}')
-
-
-def plot_graph(g, target):
-    c = g[0]
-    graphstring = stringify_cdag(g)
-    g = ig.Graph.Adjacency(g[1].tolist())
-    ig.plot(g,
-            target,
-            vertex_size=75,
-            vertex_color='grey',
-            vertex_label=c,
-            layout='circle',
-            bbox=(0, 0, 300, 300),
-            margin=50)
-
-
-def visualize_graphs(graphs, filename):
-    graphs, graph_counts = get_graphs_by_count(graphs)
-
-    selected_graphs = graphs[:5]
-
-    ncols = 2
-    nrows = int(np.ceil(len(selected_graphs) / 2))
-
-    px = 1/plt.rcParams['figure.dpi']  # pixel in inches
-    fig, ax = plt.subplots(nrows, ncols, figsize=(ncols*350*px, nrows*350*px))
-    ax = ax.reshape(nrows, ncols)
-    i, j = 0, 0
-    for ni in range(nrows):
-        for nj in range(ncols):
-            ax[ni, nj].axis('off')
-    for graph in selected_graphs:
-        plot_graph(graph, ax[i, j])
-        if j+1 == ncols:
-            j = 0
-            i += 1
-        else:
-            j += 1
-    plt.subplots_adjust(wspace=0, hspace=0)
-    plt.savefig(f'{filename}.png')
-    plt.clf()
-
-
-def plot_graph_scores(scores, opt_score, filepath):
-    lengths = [len(s) for s in scores]
-    scores = list(chain(*scores))
-    scores = list(map(lambda x: x.item(), scores))
-    plt.plot(scores)
-    for i, l in enumerate(lengths):
-        plt.axvline(l*(i+1), color='green')
-    if opt_score is not None:
-        plt.axhline(opt_score, color='red', linestyle=':')
-    plt.savefig(f'{filepath}/scores.png')
-    plt.clf()
 
 
 def train(data, init_params, score_type, max_em_iters, n_mcmc_samples, n_mcmc_warmup, min_clusters, max_clusters):

@@ -290,6 +290,37 @@ class DataGen:
 
         return data_out, (self.get_sachs_ground_truth(), None, None, C, G_C)
 
+    def get_sachs_data_full(self,
+                            center: bool = True,
+                            print_labels: bool = False,
+                            normalize=True,
+                            n_data=853,
+                            ):
+        data = pd.read_csv('./data/sachs_observational.csv')
+        data_out = data.values
+        if center:
+            if normalize:
+                data_out = (data_out - np.mean(data_out, axis=0)) / \
+                    np.std(data_out, axis=0)
+            else:
+                data_out = data_out - np.mean(data_out, axis=0)
+
+        # self.key, subkey = random.split(self.key)
+        # idxs = random.choice(
+        #     self.key, data_out.shape[0], shape=(n_data,), replace=False)
+        # data_out = data_out[idxs]
+
+        # C = [{2, 3, 4}, {0, 1, 5, 6, 7, 8, 9, 10}]
+        # G_C = np.array([[0, 0], [0, 0]])
+
+        C = [{5, 2, 3}, {6}, {7, 8, 0, 1}, {4}]
+        G_C = np.array([[0, 0, 1, 0],
+                        [1, 0, 1, 1],
+                        [0, 0, 0, 1],
+                        [0, 0, 0, 0]])
+
+        return data_out, (self.get_sachs_ground_truth(), None, None, C, G_C)
+
     def get_sachs_ground_truth(self):
         """Labels are ['praf', 'pmek', 'plcg', 'PIP2', 'PIP3', 'p44/42', 'pakts473',
         'PKA', 'PKC', 'P38', 'pjnk']."""
