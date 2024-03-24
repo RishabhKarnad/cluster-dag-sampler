@@ -1,0 +1,39 @@
+#! /bin/bash
+
+DIR=$(date +"%Y-%m-%d-%T")
+
+mkdir -p results/$DIR/bayesian/sachs
+mkdir -p results/$DIR/bayesian/housing
+
+N_DATA_SAMPLES=10000
+N_MCMC_SAMPLES=1000
+N_MCMC_WARMUP=250
+MAX_EM_ITERS=5
+MAX_MLE_ITERS=1000
+NUM_CHAINS=8
+
+python run_experiment.py \
+    --score 'Bayesian' \
+    --n_data_samples $N_DATA_SAMPLES \
+    --n_mcmc_samples $N_MCMC_SAMPLES \
+    --n_mcmc_warmup $N_MCMC_WARMUP \
+    --max_em_iters $MAX_EM_ITERS \
+    --max_mle_iters $MAX_MLE_ITERS \
+    --min_clusters 4 \
+    --max_clusters 4 \
+    --num_chains $NUM_CHAINS \
+    --dataset 'sachs' \
+    --output_path results/$DIR/bayesian/sachs
+
+python run_experiment.py \
+    --score 'Bayesian' \
+    --n_data_samples $N_DATA_SAMPLES \
+    --n_mcmc_samples $N_MCMC_SAMPLES \
+    --n_mcmc_warmup $N_MCMC_WARMUP \
+    --max_em_iters $MAX_EM_ITERS \
+    --max_mle_iters $MAX_MLE_ITERS \
+    --min_clusters 9 \
+    --max_clusters 9 \
+    --num_chains $NUM_CHAINS \
+    --dataset 'housing' \
+    --output_path results/$DIR/bayesian/housing
