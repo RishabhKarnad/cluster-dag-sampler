@@ -154,6 +154,27 @@ class GraphProposalDistribution:
         return -np.log(self.total_neighbours)
 
 
+class CDAGProposalDistribution:
+    def __init__(self, G_C, min_clusters, max_clusters):
+        C, E_C = G_C
+        self.q_c = ClusteringProposalDistribution(
+            C, min_clusters, max_clusters)
+        self.q_e_c = GraphProposalDistribution(E_C)
+
+    def sample(self):
+        C_star = self.q_c.sample()
+        E_C_star = self.q_e_c.sample()
+        return (C_star, E_C_star)
+
+    def pdf(self, G_C):
+        C, E_C = G_C
+        return self.q_c.pdf(C) * self.q_e_c.pdf(E_C)
+
+    def logpdf(self, G_C):
+        C, E_C = G_C
+        return self.q_c.logpdf(C) + self.q_e_c.logpdf(E_C)
+
+
 class CDAGSampler:
     def __init__(self, *, data, score, min_clusters=None, max_clusters=None, initial_sample=None):
         m, n = data.shape
@@ -170,8 +191,7 @@ class CDAGSampler:
             initial_sample = (C_init, G_init)
 
         self.samples = [initial_sample]
-        self.C_proposed = []
-        self.G_proposed = []
+        self.G_C_proposed = []
         self.U = stats.uniform(0, 1)
 
         self.data = data
@@ -188,8 +208,7 @@ class CDAGSampler:
     def _reset(self, C_init, G_init):
         self.samples = [(C_init, G_init)]
         self.scores = []
-        self.C_proposed = []
-        self.G_proposed = []
+        self.G_C_proposed = []
 
     def set_parameters(self, theta, Cov):
         self.theta = theta
@@ -238,68 +257,50 @@ class CDAGSampler:
             # Small probability of staying in same state to make Markov Chain ergodic
             return self.samples[-1]
         else:
-            C_prev, G_prev = self.samples[-1]
+            C_prev, E_C_prev = self.samples[-1]
 
-            C_new, G_new = C_prev, G_prev
+            C_new, E_C_new = C_prev, E_C_prev
 
-            C_star = ClusteringProposalDistribution(
-                C_prev, self.min_clusters, self.max_clusters).sample()
-            self.C_proposed.append(clustering_to_matrix(C_star, k=len(C_star)))
+            C_star, E_C_star = CDAGProposalDistribution(
+                (C_prev, E_C_prev), self.min_clusters, self.max_clusters).sample()
+            self.G_C_proposed.append((
+                clustering_to_matrix(C_star, k=len(C_star)),
+                E_C_star
+            ))
 
             if cb is not None:
-                cb(C_star)
+                cb((C_star, E_C_star))
 
             seed = random_state.get_random_number()
             u = self.U.rvs(random_state=seed)
-            a = self.log_prob_accept_C(C_star, G_prev)
+            a = self.log_prob_accept((C_star, E_C_prev))
             if np.log(u) < a:
                 C_new = C_star
+                E_C_new = E_C_star
             else:
                 C_new = C_prev
+                E_C_new = E_C_prev
 
-            G_star = GraphProposalDistribution(G_prev).sample()
-            self.G_proposed.append(G_star)
+            return C_new, E_C_new
 
-            if cb is not None:
-                cb(G_star)
+    def log_prob_accept(self, G_C_star):
+        C_star, E_C_star = G_C_star
 
-            seed = random_state.get_random_number()
-            u = self.U.rvs(random_state=seed)
-            a = self.log_prob_accept_G(G_star, C_new)
-            if np.log(u) < a:
-                G_new = G_star
-            else:
-                G_new = G_prev
-
-            return C_new, G_new
-
-    def log_prob_accept_C(self, C_star, G):
-        C_prev, _ = self.samples[-1]
+        C_prev, E_C_prev = self.samples[-1]
 
         log_q_C_prev = ClusteringProposalDistribution(
             C_star, self.min_clusters, self.max_clusters).logpdf(C_prev)
         log_q_C_star = ClusteringProposalDistribution(
             C_prev, self.min_clusters, self.max_clusters).logpdf(C_star)
 
-        log_prob_C_star = self.cdag_score((C_star, G))
-        log_prob_C_prev = self.cdag_score((C_prev, G))
+        log_q_E_C_prev = GraphProposalDistribution(E_C_star).logpdf(E_C_prev)
+        log_q_E_C_star = GraphProposalDistribution(E_C_prev).logpdf(E_C_star)
 
-        rho = ((log_q_C_prev + log_prob_C_star)
-               - (log_q_C_star + log_prob_C_prev))
+        log_prob_G_C_star = self.cdag_score((C_star, E_C_star))
+        log_prob_G_C_prev = self.cdag_score((C_prev, E_C_prev))
 
-        return min(0, rho)
-
-    def log_prob_accept_G(self, G_star, C):
-        _, G_prev = self.samples[-1]
-
-        log_q_G_prev = GraphProposalDistribution(G_star).logpdf(G_prev)
-        log_q_G_star = GraphProposalDistribution(G_prev).logpdf(G_star)
-
-        log_prob_G_star = self.cdag_score((C, G_star))
-        log_prob_G_prev = self.cdag_score((C, G_prev))
-
-        rho = ((log_q_G_prev + log_prob_G_star)
-               - (log_q_G_star + log_prob_G_prev))
+        rho = ((log_q_C_prev + log_q_E_C_prev + log_prob_G_C_star)
+               - (log_q_C_star + log_q_E_C_star + log_prob_G_C_prev))
 
         return min(0, rho)
 

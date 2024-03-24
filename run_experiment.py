@@ -102,8 +102,7 @@ def train(data, init_params, score_type, max_em_iters, n_mcmc_samples, n_mcmc_wa
     loss_trace = []
     samples = []
     scores = []
-    proposal_C = []
-    proposal_G = []
+    proposal_G_C = []
 
     m, n = data.shape
     theta, Cov = init_params['theta'], init_params['Cov']
@@ -139,8 +138,7 @@ def train(data, init_params, score_type, max_em_iters, n_mcmc_samples, n_mcmc_wa
         clgn = ClusterLinearGaussianNetwork(n_vars=n)
 
         samples_i, scores_i = cdag_sampler.get_samples(), cdag_sampler.get_scores()
-        proposal_C.append(cdag_sampler.C_proposed)
-        proposal_G.append(cdag_sampler.G_proposed)
+        proposal_G_C.append(cdag_sampler.G_C_proposed)
 
         initial_cdag_sample = samples_i[-1]
 
@@ -156,7 +154,7 @@ def train(data, init_params, score_type, max_em_iters, n_mcmc_samples, n_mcmc_wa
         samples.append(samples_i)
         scores.append(scores_i)
 
-    return samples, scores, theta, loss_trace, proposal_C, proposal_G
+    return samples, scores, theta, loss_trace, proposal_G_C
 
 
 def gen_data(args):
@@ -238,14 +236,14 @@ def run(args):
             'Cov': Cov_true,
         }
 
-        cdag_samples, cdag_scores, theta, loss_trace, C_proposals, G_proposals = train(data,
-                                                                                       init_params,
-                                                                                       args.score,
-                                                                                       args.max_em_iters,
-                                                                                       args.n_mcmc_samples,
-                                                                                       args.n_mcmc_warmup,
-                                                                                       args.min_clusters,
-                                                                                       args.max_clusters)
+        cdag_samples, cdag_scores, theta, loss_trace, G_C_proposals = train(data,
+                                                                            init_params,
+                                                                            args.score,
+                                                                            args.max_em_iters,
+                                                                            args.n_mcmc_samples,
+                                                                            args.n_mcmc_warmup,
+                                                                            args.min_clusters,
+                                                                            args.max_clusters)
 
         if theta_true is not None:
             evaluate_samples(samples=cdag_samples[-1],
@@ -263,9 +261,9 @@ def run(args):
             np.save(f'{args.output_path}/em_iter_{i}_scores.npy',
                     cdag_scores[i])
             np.save(f'{args.output_path}/em_iter_{i}_C_proposals.npy',
-                    C_proposals[i])
+                    list(map(lambda x: x[0], G_C_proposals[i])))
             np.save(f'{args.output_path}/em_iter_{i}_G_proposals.npy',
-                    G_proposals[i])
+                    list(map(lambda x: x[1], G_C_proposals[i])))
 
         for i, graphs in enumerate(cdag_samples):
             visualize_graphs(graphs, f'{args.output_path}/em_iter_{i}.png')
