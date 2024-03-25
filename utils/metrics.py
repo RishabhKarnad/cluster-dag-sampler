@@ -1,10 +1,43 @@
 import numpy as np
 
 import networkx as nx
+from sklearn.metrics.cluster import rand_score, mutual_info_score
 
 from data.group_faithful import GroupFaithfulDAG
 from models.cluster_linear_gaussian_network import ClusterLinearGaussianNetwork
 from utils.c_dag import clustering_to_matrix
+
+
+"""
+Clustering metrics
+"""
+
+
+def rand_index(C_true, C_pred):
+    labels_true = np.argwhere(C_true > 0)[:, 1]
+    labels_pred = np.argwhere(C_pred > 0)[:, 1]
+    return rand_score(labels_true, labels_pred)
+
+
+def expected_rand_index(C_true, C_samples):
+    scores = [rand_index(C_true, C) for C in C_samples]
+    return np.mean(scores), np.std(scores)
+
+
+def mutual_information_score(C_true, C_pred):
+    labels_true = np.argwhere(C_true > 0)[:, 1]
+    labels_pred = np.argwhere(C_pred > 0)[:, 1]
+    return mutual_info_score(labels_true, labels_pred)
+
+
+def expected_mutual_information_score(C_true, C_samples):
+    scores = [mutual_information_score(C_true, C) for C in C_samples]
+    return np.mean(scores), np.std(scores)
+
+
+"""
+Graph metrics
+"""
 
 
 def compute_metrics(B_est, B_true):
@@ -69,117 +102,55 @@ def compute_metrics(B_est, B_true):
     missing_lower = np.setdiff1d(cond_lower, pred_lower, assume_unique=True)
     shd = len(extra_lower) + len(missing_lower) + len(reverse)
     shd_wc = shd + len(pred_und)
-    prc = float(len(true_pos)) / \
-        max(float(len(true_pos)+len(reverse) + len(false_pos)), 1.)
+    prc = float(len(true_pos)) / max(
+        float(len(true_pos) + len(reverse) + len(false_pos)), 1.0
+    )
     rec = tpr
-    return {'fdr': fdr, 'tpr': tpr, 'fpr': fpr, 'prc': prc, 'rec': rec, 'shd': shd, 'shd_wc': shd_wc, 'nnz': pred_size}
+    return {
+        'fdr': fdr,
+        'tpr': tpr,
+        'fpr': fpr,
+        'prc': prc,
+        'rec': rec,
+        'shd': shd,
+        'shd_wc': shd_wc,
+        'nnz': pred_size,
+    }
 
 
-def is_dsep(graph, x, y, z):
-    # Check if x and y are d-separated given z in the graph
-    return not any([path for path in nx.all_simple_paths(graph, source=x, target=y) if is_blocked(graph, path, z)])
+def shd_expanded_graph(true_cdag, cdag):
+    C, G_C = cdag
+    C_true, G_C_true = true_cdag
+    C = clustering_to_matrix(C, k=len(C))
+    G_expand = C@G_C@C.T
+    G_expand_true = C_true@G_C_true@C_true.T
+
+    return compute_metrics(G_expand, G_expand_true)['shd']
 
 
-def is_blocked(graph, path, z):
-    # Check if the path is blocked by a set of nodes z in the graph
-    for i in range(len(path) - 2):
-        if (path[i + 1], path[i + 2]) not in graph.edges() and path[i + 1] not in z:
-            return True
-        if path[i + 1] in z:
-            return True
-    return False
-
-
-def essential_graph(adjacency_matrix):
-    graph = nx.DiGraph(adjacency_matrix)
-    essential_graph = graph.copy()
-
-    nodes = list(graph.nodes())
-    for i in range(len(nodes)):
-        for j in range(i+1, len(nodes)):
-            if graph.has_edge(nodes[i], nodes[j]):
-                essential_graph.remove_edge(nodes[i], nodes[j])
-                if not is_dsep(graph, nodes[i], nodes[j], essential_graph.predecessors(nodes[i])):
-                    essential_graph.add_edge(nodes[i], nodes[j])
-                else:
-                    essential_graph.add_edge(nodes[j], nodes[i])
-
-    return essential_graph
-
-
-def cluster_shd(g_true, g_c):
-    def get_cdag(clusters, adj):
-        edges = np.zeros((len(clusters), len(clusters)))
-
-        for i, C_i in enumerate(clusters):
-            for j, C_j in enumerate(clusters):
-                if i != j:
-                    for p, X_p in enumerate(C_i):
-                        for q, X_q in enumerate(C_j):
-                            edges[i, j] += adj[X_p, X_q]
-
-        return (clusters, edges)
-
-    g_c_true = get_cdag(clusters=g_c[0], adj=g_true)
-
-    return compute_metrics(essential_graph(g_c_true[1]), essential_graph(g_c[1]))['shd']
-
-
-def expected_cluster_shd(g_true, graphs):
-    shds = [cluster_shd(g_true, g_c) for g_c in graphs]
+def expected_shd(cdag_true, cdag_samples):
+    shds = [shd_expanded_graph(cdag_true, cdag)
+            for cdag in cdag_samples]
     return np.mean(shds), np.std(shds)
 
 
-def shd_expanded_graph(cdag, theta, true_dag):
-    C, G_C = cdag
-    C = clustering_to_matrix(C, k=len(C))
-    # theta = np.where(theta > 0.5, 1, 0)
-    G_expand = C@G_C@C.T
-    # G = G_expand*theta
-    G = G_expand
-
-    true_dag = true_dag*G_expand
-
-    return compute_metrics(G, np.array(true_dag))['shd']
+"""
+Distribution metrics
+"""
 
 
-def metrics_expanded_graph(cdag, theta, true_dag):
-    C, G_C = cdag
-    C = clustering_to_matrix(C, k=len(C))
-    # theta = np.where(theta > 0.5, 1, 0)
-    G_expand = C@G_C@C.T
-    # G = G_expand*theta
-    G = G_expand
-
-    true_dag = true_dag*G_expand
-
-    vcn_stats = compute_metrics(G, true_dag)
-
-    return vcn_stats['shd'], vcn_stats['prc'], vcn_stats['rec']
-
-
-def expected_shd(cdags, theta, true_dag):
-    shds = [shd_expanded_graph(cdag, theta, true_dag) for cdag in cdags]
-    return np.mean(shds), np.std(shds)
-
-
-def expected_metrics(cdags, theta, true_dag):
-    metrics = [metrics_expanded_graph(cdag, theta, true_dag) for cdag in cdags]
-    shds = list(map(lambda x: x[0], metrics))
-    prcs = list(map(lambda x: x[1], metrics))
-    recs = list(map(lambda x: x[2], metrics))
-    return np.mean(shds), np.std(shds), np.mean(prcs), np.mean(recs)
-
-
-def compute_nlls(data, samples, theta):
+def nll(data, C, G, theta):
     n, n = theta.shape
     clgn = ClusterLinearGaussianNetwork(n)
-    nlls = [-clgn.logpmf(data, theta, clustering_to_matrix(C, len(C)), G)
-            for (C, G) in samples]
+    return -clgn.logpmf(data, theta, clustering_to_matrix(C, len(C)), G)
+
+
+def expected_nll(data, samples, theta):
+    nlls = [nll(data, C, G, theta) for (C, G) in samples]
     return np.mean(nlls), np.std(nlls)
 
 
-def compute_mse_theta(G_C, theta, theta_true):
+def mse_theta(G_C, theta, theta_true):
     C, G = G_C
     C = clustering_to_matrix(C, len(C))
     G_expand = C@G@C.T
@@ -187,21 +158,6 @@ def compute_mse_theta(G_C, theta, theta_true):
     return np.mean((theta_masked - theta_true)**2)
 
 
-def compute_mse_theta_all(samples, theta, theta_true):
-    mses = [compute_mse_theta(sample, theta, theta_true) for sample in samples]
+def expected_mse_theta(samples, theta, theta_true):
+    mses = [mse_theta(sample, theta, theta_true) for sample in samples]
     return np.mean(mses), np.std(mses)
-
-
-def faithfulness_score(samples, g_true, *, key):
-    group_faithful_model = GroupFaithfulDAG(key)
-    count = 0
-    for groups, group_dag in samples:
-        group_names = list(map(lambda x: {x}, np.arange(group_dag.shape[0])))
-        H_indeps = group_faithful_model.get_group_dag_indeps(
-            group_dag, group_names)
-        isFaithful, _ = group_faithful_model.has_same_indepencies(
-            H_indeps, groups, g_true)
-        if isFaithful:
-            count += 1
-
-    return count / len(samples)
