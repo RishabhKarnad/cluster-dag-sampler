@@ -5,8 +5,8 @@ from tqdm import tqdm
 import scipy.linalg as linalg
 import scipy.stats as stats
 import numpy as np
-from utils.metrics import metrics_expanded_graph
 import jax.random as random
+from utils.metrics import rand_index, mutual_information_score, shd_expanded_graph, shd_expanded_mixed_graph
 from data.loader import DataGen
 from models.gaussian import GaussianDistribution
 from scores.cic_score import ScoreCIC
@@ -208,12 +208,14 @@ def main():
     data, scm = gen_data(args.dataset, args.n_data_samples)
 
     (g_true, theta_true, Cov_true, grouping, group_dag) = scm
+    C_true = clustering_to_matrix(grouping, len(grouping))
+    G_true = group_dag
 
     score_CIC = ScoreCIC(
         data=data, dist=GaussianDistribution)
 
     stats = pd.DataFrame(
-        columns=['run', 'shd', 'precision', 'recall'])
+        columns=['run', 'rand_index', 'mi', 'shd', 'shd_cpdag', 'score'])
 
     optimal_score = score_CIC((grouping, group_dag))
     logging.info(f'Optimal graph score {optimal_score}')
@@ -224,6 +226,7 @@ def main():
 
         (C, G_C), graph_score, scores = find_cdag(
             data, n_clus=args.n_clusters, score=score_CIC, steps=args.n_iters, logger=logging, desc=f'Run {i}')
+        C_mat = clustering_to_matrix(C, len(C))
 
         C_dummy = list(map(lambda x: {x}, range(len(C))))
 
@@ -234,10 +237,18 @@ def main():
         # logging.info(f'SHD: {shd}')
         # logging.info(f'Precision: {prc}')
         # logging.info(f'Recall: {rec}')
+        ri = rand_index(C_true, C_mat)
+        mi = mutual_information_score(C_true, C_mat)
+        shd = shd_expanded_graph((C_true, G_true), (C, G_C))
+        shd_cpdag = shd_expanded_mixed_graph((C_true, G_true), (C, G_C))
         logging.info(f'Score: {graph_score}')
 
         stats = pd.concat([stats, pd.DataFrame([{
             'run': i,
+            'rand_index': ri,
+            'mi': mi,
+            'shd': shd,
+            'shd_cpdag': shd_cpdag,
             # 'shd': shd,
             # 'precision': prc,
             # 'recall': rec,
