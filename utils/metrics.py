@@ -133,12 +133,12 @@ def shd_expanded_mixed_graph(true_cdag, cdag):
     C_true, G_C_true = true_cdag
     C = clustering_to_matrix(C, k=len(C))
     G_expand = C@G_C@C.T
-    G_undirected = C@C.T * -1
+    G_undirected = np.tril(C@C.T, -1) * -1
 
     G_cpdag = G_expand + G_undirected
 
     G_expand_true = C_true@G_C_true@C_true.T
-    G_undirected_true = C_true@C_true.T * -1
+    G_undirected_true = np.tril(C_true@C_true.T, -1) * -1
 
     G_cpdag_true = G_expand_true + G_undirected_true
 

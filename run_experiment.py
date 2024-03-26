@@ -58,7 +58,6 @@ def parse_args():
 def evaluate_samples(*, C_true, G_true, samples, scores, theta, theta_true, data, filepath):
     C_samples = list(
         map(lambda x: clustering_to_matrix(x[0], len(x[0])), samples))
-    G_samples = list(map(lambda x: x[1], samples))
 
     C_true = clustering_to_matrix(C_true, len(C_true))
 
