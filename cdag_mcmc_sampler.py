@@ -20,9 +20,6 @@ MAX_PARENTS = 2
 N_WARMUP = 100
 N_SAMPLES = 500
 
-eps = 1 / 10**256
-log_eps = np.log(eps)
-
 
 class ClusteringProposalDistribution:
     def __init__(self, C, min_clusters, max_clusters):

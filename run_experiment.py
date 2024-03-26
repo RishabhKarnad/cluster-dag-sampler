@@ -12,7 +12,7 @@ from models.gaussian import GaussianDistribution
 from scores.cic_score import ScoreCIC
 from scores.bayesian_cdag_score import BayesianCDAGScore
 from models.cluster_linear_gaussian_network import ClusterLinearGaussianNetwork
-from utils.metrics import nll, expected_nll, mse_theta, expected_mse_theta, rand_index, expected_rand_index, mutual_information_score, expected_mutual_information_score, shd_expanded_graph, expected_shd
+from utils.metrics import nll, expected_nll, mse_theta, expected_mse_theta, rand_index, expected_rand_index, mutual_information_score, expected_mutual_information_score, shd_expanded_graph, expected_shd, shd_expanded_mixed_graph, expected_cpdag_shd
 from utils.c_dag import clustering_to_matrix, get_graphs_by_count
 from utils.visualization import visualize_graphs, plot_graph_scores
 from utils.sys import initialize_logger
@@ -73,6 +73,10 @@ def evaluate_samples(*, C_true, G_true, samples, scores, theta, theta_true, data
     shd_mean, shd_stddev = expected_shd((C_true, G_true), samples)
     logging.info(f'E-SHD: {shd_mean}+-{shd_stddev}')
 
+    shd_cpdag_mean, shd_cpdag_stddev = expected_cpdag_shd(
+        (C_true, G_true), samples)
+    logging.info(f'CPDAG E-SHD: {shd_cpdag_mean}+-{shd_cpdag_stddev}')
+
     nll_mean, nll_stddev = expected_nll(data, samples, theta)
     logging.info(f'NLL: {nll_mean}+-{nll_stddev}')
 
@@ -97,6 +101,9 @@ def evaluate_samples(*, C_true, G_true, samples, scores, theta, theta_true, data
 
     shd_best = shd_expanded_graph((C_true, G_true), best_cdag)
     logging.info(f'\tSHD: {shd_best}')
+
+    shd_cpdag_best = shd_expanded_mixed_graph((C_true, G_true), best_cdag)
+    logging.info(f'\tCPDAG SHD: {shd_cpdag_best}')
 
     nll_best = nll(data, C_best, G_best, theta)
     logging.info(f'\tNLL: {nll_best}')
@@ -129,6 +136,9 @@ def evaluate_samples(*, C_true, G_true, samples, scores, theta, theta_true, data
 
     shd_mode = shd_expanded_graph((C_true, G_true), mode_dag)
     logging.info(f'\tSHD: {shd_mode}')
+
+    shd_cpdag_mode = shd_expanded_mixed_graph((C_true, G_true), mode_dag)
+    logging.info(f'\tCPDAG SHD: {shd_cpdag_mode}')
 
     nll_mode = nll(data, C_mode, G_mode, theta)
     logging.info(f'\tNLL: {nll_mode}')

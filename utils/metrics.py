@@ -128,8 +128,31 @@ def shd_expanded_graph(true_cdag, cdag):
     return compute_metrics(G_expand, G_expand_true)['shd']
 
 
+def shd_expanded_mixed_graph(true_cdag, cdag):
+    C, G_C = cdag
+    C_true, G_C_true = true_cdag
+    C = clustering_to_matrix(C, k=len(C))
+    G_expand = C@G_C@C.T
+    G_undirected = C@C.T * -1
+
+    G_cpdag = G_expand + G_undirected
+
+    G_expand_true = C_true@G_C_true@C_true.T
+    G_undirected_true = C_true@C_true.T * -1
+
+    G_cpdag_true = G_expand_true + G_undirected_true
+
+    return compute_metrics(G_cpdag, G_cpdag_true)['shd']
+
+
 def expected_shd(cdag_true, cdag_samples):
     shds = [shd_expanded_graph(cdag_true, cdag)
+            for cdag in cdag_samples]
+    return np.mean(shds), np.std(shds)
+
+
+def expected_cpdag_shd(cdag_true, cdag_samples):
+    shds = [shd_expanded_mixed_graph(cdag_true, cdag)
             for cdag in cdag_samples]
     return np.mean(shds), np.std(shds)
 

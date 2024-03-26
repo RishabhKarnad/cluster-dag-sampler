@@ -5,7 +5,7 @@ from tqdm import tqdm
 import scipy.linalg as linalg
 import scipy.stats as stats
 import numpy as np
-from utils.metrics import shd_expanded_graph, metrics_expanded_graph
+from utils.metrics import metrics_expanded_graph
 import jax.random as random
 from data.loader import DataGen
 from models.gaussian import GaussianDistribution
