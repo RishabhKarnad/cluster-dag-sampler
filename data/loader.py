@@ -8,6 +8,8 @@ import jax.scipy.stats as stats
 from pgmpy.models import LinearGaussianBayesianNetwork
 from pgmpy.factors.continuous import LinearGaussianCPD
 import scipy.sparse as sparse
+import scipy
+from functools import reduce
 import pandas as pd
 
 from data.group_faithful import GroupFaithfulDAG
@@ -191,8 +193,8 @@ class DataGen:
             mu_1 = np.array([11, 23])
             mu_2 = np.array([31])
 
-        sigma_1 = 0.1*np.array([[1, 0.99], [0.99, 1]])
-        sigma_2 = np.array([[0.1]])
+        sigma_1 = self.obs_noise*np.array([[1, 0.99], [0.99, 1]])
+        sigma_2 = self.obs_noise*np.array([[1]])
 
         subkey = random_state.get_key()
         Z_1 = random.multivariate_normal(
@@ -377,3 +379,47 @@ class DataGen:
         Cov_noise = stats.wishart.rvs(nvars, 100, size=(5, 5))
         Cov_mask_true_noise = Cov_mask_true+G_anticov*Cov_noise
         return Cov_mask_true_noise, Cov_mask_true
+
+    def get_index(self, arr):
+        len_ = len(arr)
+        idx = np.zeros((len_*len_, 2))
+        idx[:, 0] = np.reshape(np.tile(np.c_[arr], len_), len_*len_)
+        idx[:, 1] = np.tile(arr, len_)
+        idx = idx.astype(np.int64)
+        return idx
+
+    def compute_joint2condcov(self, adj, C_true, Cov_joint):
+        C_group = [np.where(C_j > 0)[0].tolist() for C_j in C_true.T]
+        G = nx.from_numpy_array(adj, create_using=nx.MultiDiGraph())
+        Cond_Cov = []
+        for node in G.nodes:
+            parents = list(G.predecessors(node))
+            if parents:
+                node_group = C_group[node]
+                parent_group = sorted(sum([C_group[i] for i in parents], []))
+                arr = np.array(node_group+parent_group)
+                len_ = len(arr)
+                split_index = len(node_group)
+                idx = self.get_index(arr)
+                Cov_full = Cov_joint[(idx[:, 0], idx[:, 1])]
+                Cov_full = Cov_full.reshape((len_, len_))
+                # CovX|Y=CovX-beta*CovY*beta_T
+                # beta=CovXY*CovY-1
+                beta = Cov_full[:split_index, split_index:]@np.linalg.inv(
+                    Cov_full[split_index:, split_index:])
+                Cov_ = Cov_full[:split_index, :split_index] - \
+                    beta@Cov_full[split_index:, split_index:]@beta.T
+            else:
+                node_group = C_group[node]
+                arr = np.array(node_group)
+                len_ = len(arr)
+                idx = self.get_index(arr)
+                Cov_full = Cov_joint[(idx[:, 0], idx[:, 1])]
+                Cov_full = Cov_full.reshape((len_, len_))
+                Cov_ = Cov_full
+
+            Cond_Cov.append(Cov_)
+            Cond_Cov_mat = reduce(
+                lambda a, b: scipy.linalg.block_diag(a, b), Cond_Cov)
+
+        return Cond_Cov_mat
