@@ -26,8 +26,6 @@ def parse_args():
 
     parser.add_argument('--random_seed', type=int, default=42)
 
-    parser.add_argument('--score', type=str, choices=['CIC', 'Bayesian'])
-
     parser.add_argument('--dataset', type=str, choices=[
         'full7var',
         '3var',
@@ -57,9 +55,9 @@ def parse_args():
 
 def evaluate_samples(*, C_true, G_true, samples, scores, theta, theta_true, data, filepath):
     C_samples = list(
-        map(lambda x: clustering_to_matrix(x[0], len(x[0])), samples))
+        map(lambda x: clustering_to_matrix(x[0]), samples))
 
-    C_true = clustering_to_matrix(C_true, len(C_true))
+    C_true = clustering_to_matrix(C_true)
 
     # G_expanded = C_true@G_true@C_true.T
 
@@ -90,7 +88,7 @@ def evaluate_samples(*, C_true, G_true, samples, scores, theta, theta_true, data
     C_best, G_best = best_cdag
     m, n = data.shape
 
-    C_best_mat = clustering_to_matrix(C_best, len(C_best))
+    C_best_mat = clustering_to_matrix(C_best)
 
     rand_index_best = rand_index(C_true, C_best_mat)
     logging.info(f'\tRand-index: {rand_index_best}')
@@ -115,7 +113,7 @@ def evaluate_samples(*, C_true, G_true, samples, scores, theta, theta_true, data
 
     graphs, graph_counts = get_graphs_by_count(samples)
     np.save(f'{filepath}/clusterings_by_count.npy',
-            list(map(lambda x: clustering_to_matrix(x[0], len(x[0])), graphs)))
+            list(map(lambda x: clustering_to_matrix(x[0]), graphs)))
     np.save(f'{filepath}/graphs_by_count.npy',
             list(map(lambda x: x[1], graphs)))
     np.save(f'{filepath}/cdag_counts.npy', graph_counts)
@@ -125,7 +123,7 @@ def evaluate_samples(*, C_true, G_true, samples, scores, theta, theta_true, data
     C_mode, G_mode = mode_dag
     m, n = data.shape
 
-    C_mode_mat = clustering_to_matrix(C_mode, len(C_mode))
+    C_mode_mat = clustering_to_matrix(C_mode)
 
     rand_index_mode = rand_index(C_true, C_mode_mat)
     logging.info(f'\tRand-index: {rand_index_mode}')
@@ -146,7 +144,7 @@ def evaluate_samples(*, C_true, G_true, samples, scores, theta, theta_true, data
     logging.info(f'\tMSE (Theta): {mse_theta_mode}')
 
 
-def train(data, init_params, score_type, max_em_iters, n_mcmc_samples, n_mcmc_warmup, min_clusters, max_clusters):
+def train(data, init_params, max_em_iters, n_mcmc_samples, n_mcmc_warmup, min_clusters, max_clusters):
     loss_trace = []
     samples = []
     scores = []
@@ -160,19 +158,10 @@ def train(data, init_params, score_type, max_em_iters, n_mcmc_samples, n_mcmc_wa
     for i in range(max_em_iters):
         print(f'EM iteration {i+1}/{max_em_iters}')
 
-        if score_type == 'CIC':
-            score = ScoreCIC(
-                data=data,
-                dist=GaussianDistribution,
-                parameters={
-                    'mean': np.array((data@theta).mean(axis=0)),
-                    'cov': Cov,
-                })
-        elif score_type == 'Bayesian':
-            score = BayesianCDAGScore(data=data,
-                                      min_clusters=min_clusters,
-                                      mean_clusters=max_clusters,
-                                      max_clusters=max_clusters)
+        score = BayesianCDAGScore(data=data,
+                                  min_clusters=min_clusters,
+                                  mean_clusters=max_clusters,
+                                  max_clusters=max_clusters)
 
         cdag_sampler = CDAGSampler(data=data,
                                    score=score,
@@ -251,11 +240,8 @@ def run(args):
         logging.info('True covariance')
         logging.info(Cov_true)
         logging.info('Ground truth NLL')
-        logging.info(-ClusterLinearGaussianNetwork(n).logpmf(data,
-                                                             theta_true,
-                                                             clustering_to_matrix(
-                                                                 grouping, len(grouping)),
-                                                             group_dag))
+        logging.info(-ClusterLinearGaussianNetwork(n)
+                     .logpmf(data, theta_true, clustering_to_matrix(grouping), group_dag))
     logging.info(
         '============================================================')
 
@@ -286,7 +272,6 @@ def run(args):
 
         cdag_samples, cdag_scores, theta, loss_trace, G_C_proposals = train(data,
                                                                             init_params,
-                                                                            args.score,
                                                                             args.max_em_iters,
                                                                             args.n_mcmc_samples,
                                                                             args.n_mcmc_warmup,
@@ -305,7 +290,7 @@ def run(args):
 
         for i in range(len(cdag_samples)):
             np.save(f'{args.output_path}/em_iter_{i}_clusterings.npy',
-                    list(map(lambda G_C: clustering_to_matrix(G_C[0], len(G_C[0])), cdag_samples[i])))
+                    list(map(lambda G_C: clustering_to_matrix(G_C[0]), cdag_samples[i])))
             np.save(f'{args.output_path}/em_iter_{i}_graphs.npy',
                     list(map(lambda G_C: G_C[1], cdag_samples[i])))
             np.save(f'{args.output_path}/em_iter_{i}_scores.npy',
@@ -319,19 +304,10 @@ def run(args):
             visualize_graphs(graphs, f'{args.output_path}/em_iter_{i}.png')
 
         if theta_true is not None:
-            if args.score == 'CIC':
-                score = ScoreCIC(
-                    data=data,
-                    dist=GaussianDistribution,
-                    parameters={
-                        'mean': np.array((data@theta_true).mean(axis=0)),
-                        'cov': Cov_true,
-                    })
-            elif args.score == 'Bayesian':
-                score = BayesianCDAGScore(data=data,
-                                          min_clusters=args.min_clusters,
-                                          mean_clusters=args.max_clusters,
-                                          max_clusters=args.max_clusters)
+            score = BayesianCDAGScore(data=data,
+                                      min_clusters=args.min_clusters,
+                                      mean_clusters=args.max_clusters,
+                                      max_clusters=args.max_clusters)
 
             opt_cdag = (grouping, group_dag)
             opt_score = score(opt_cdag, theta=theta_true*g_true)

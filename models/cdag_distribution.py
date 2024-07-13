@@ -30,7 +30,7 @@ class CDAGJointDistribution:
 
     def logpmf(self, C, G, X, theta):
         k = len(C)
-        C_mat = clustering_to_matrix(C, len(C))
+        C_mat = clustering_to_matrix(C)
         p_k = stats.randint(self.min_clusters, self.max_clusters+1).logpmf(k)
         p_c = self.cluster_prior(self.n_vars, k).logpmf(C_mat)
         p_g = self.graph_prior(self.n_vars).logpmf(G)

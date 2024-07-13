@@ -2,11 +2,9 @@ import numpy as np
 import scipy.stats as stats
 from scipy.special import comb
 from copy import deepcopy
-from dataclasses import dataclass
 from tqdm import tqdm
 import jax.random as random
 import jax.numpy as jnp
-from functools import reduce
 
 from models.upper_triangular import UpperTriangular
 
@@ -261,7 +259,7 @@ class CDAGSampler:
             C_star, E_C_star = CDAGProposalDistribution(
                 (C_prev, E_C_prev), self.min_clusters, self.max_clusters).sample()
             self.G_C_proposed.append((
-                clustering_to_matrix(C_star, k=len(C_star)),
+                clustering_to_matrix(C_star),
                 E_C_star
             ))
 

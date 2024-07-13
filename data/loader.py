@@ -57,7 +57,7 @@ class DataGen:
     def generate_group_scm_data(self, n_samples=100, *,
                                 vstruct=True, confounded=True, zero_centered=True):
         clus = [{0, 1, 2}, {3, 4}, {5, 6}]
-        C = clustering_to_matrix(clus, k=3)
+        C = clustering_to_matrix(clus)
 
         if vstruct:
             G_C = np.array([[0, 1, 0],
@@ -174,7 +174,7 @@ class DataGen:
     def generate_group_scm_data_small_dag(self, n_samples=100, *,
                                           zero_centered=True):
         clus = [{0, 1}, {2}]
-        C = clustering_to_matrix(clus, k=2)
+        C = clustering_to_matrix(clus)
 
         G_C = np.array([[0, 1],
                         [0, 0]])
@@ -218,7 +218,7 @@ class DataGen:
     def generate_group_scm_data_small_dag_4vars(self, n_samples=100, *,
                                                 zero_centered=True):
         clus = [{0, 1}, {2, 3}]
-        C = clustering_to_matrix(clus, k=2)
+        C = clustering_to_matrix(clus)
 
         G_C = np.array([[0, 1],
                         [0, 0]])

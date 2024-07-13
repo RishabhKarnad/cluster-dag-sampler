@@ -32,7 +32,10 @@ def unstringify_cdag(cdag_string):
     return C, E_C
 
 
-def clustering_to_matrix(C, k):
+def clustering_to_matrix(C, k=None):
+    if not k:
+        k = len(C)
+
     n = np.sum([len(C_i) for C_i in C])
     m = np.zeros((n, k))
     for i, C_i in enumerate(C):

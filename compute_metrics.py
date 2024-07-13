@@ -4,9 +4,9 @@ from utils.c_dag import clustering_to_matrix, get_graphs_by_count, matrix_to_clu
 
 def evaluate_samples(*, C_true, G_true, samples, scores, theta, theta_true, data):
     C_samples = list(
-        map(lambda x: clustering_to_matrix(x[0], len(x[0])), samples))
+        map(lambda x: clustering_to_matrix(x[0]), samples))
 
-    C_true = clustering_to_matrix(C_true, len(C_true))
+    C_true = clustering_to_matrix(C_true)
 
     # G_expanded = C_true@G_true@C_true.T
 
@@ -38,7 +38,7 @@ def evaluate_samples(*, C_true, G_true, samples, scores, theta, theta_true, data
     C_best, G_best = best_cdag
     m, n = data.shape
 
-    C_best_mat = clustering_to_matrix(C_best, len(C_best))
+    C_best_mat = clustering_to_matrix(C_best)
 
     rand_index_best = rand_index(C_true, C_best_mat)
     print(f'\tRand-index: {rand_index_best}')
@@ -74,7 +74,7 @@ def evaluate_samples(*, C_true, G_true, samples, scores, theta, theta_true, data
     C_mode, G_mode = mode_dag
     m, n = data.shape
 
-    C_mode_mat = clustering_to_matrix(C_mode, len(C_mode))
+    C_mode_mat = clustering_to_matrix(C_mode)
 
     rand_index_mode = rand_index(C_true, C_mode_mat)
     print(f'\tRand-index: {rand_index_mode}')

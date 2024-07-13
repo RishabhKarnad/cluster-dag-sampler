@@ -121,7 +121,7 @@ def compute_metrics(B_est, B_true):
 def shd_expanded_graph(true_cdag, cdag):
     C, G_C = cdag
     C_true, G_C_true = true_cdag
-    C = clustering_to_matrix(C, k=len(C))
+    C = clustering_to_matrix(C)
     G_expand = C@G_C@C.T
     G_expand_true = C_true@G_C_true@C_true.T
 
@@ -131,7 +131,7 @@ def shd_expanded_graph(true_cdag, cdag):
 def shd_expanded_mixed_graph(true_cdag, cdag):
     C, G_C = cdag
     C_true, G_C_true = true_cdag
-    C = clustering_to_matrix(C, k=len(C))
+    C = clustering_to_matrix(C)
     G_expand = C@G_C@C.T
     G_undirected = np.tril(C@C.T, -1) * -1
 
@@ -165,7 +165,7 @@ Distribution metrics
 def nll(data, C, G, theta):
     n, n = theta.shape
     clgn = ClusterLinearGaussianNetwork(n)
-    return -clgn.logpmf(data, theta, clustering_to_matrix(C, len(C)), G)
+    return -clgn.logpmf(data, theta, clustering_to_matrix(C), G)
 
 
 def expected_nll(data, samples, theta):
@@ -175,7 +175,7 @@ def expected_nll(data, samples, theta):
 
 def mse_theta(G_C, theta, theta_true):
     C, G = G_C
-    C = clustering_to_matrix(C, len(C))
+    C = clustering_to_matrix(C)
     G_expand = C@G@C.T
     theta_masked = G_expand*theta
     return np.mean((theta_masked - theta_true)**2)

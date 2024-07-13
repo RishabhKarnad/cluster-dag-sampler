@@ -152,7 +152,7 @@ def find_cdag(data, *, n_clus, score, steps=100, rho=0.5, logger, desc):
 
 
 def visualize_cdag(C, G_C, filepath):
-    plt.imshow(clustering_to_matrix(C, len(C)))
+    plt.imshow(clustering_to_matrix(C))
     plt.savefig(f'{filepath}/clustering.png')
     plt.clf()
     plt.imshow(G_C)
@@ -208,7 +208,7 @@ def main():
     data, scm = gen_data(args.dataset, args.n_data_samples)
 
     (g_true, theta_true, Cov_true, grouping, group_dag) = scm
-    C_true = clustering_to_matrix(grouping, len(grouping))
+    C_true = clustering_to_matrix(grouping)
     G_true = group_dag
 
     score_CIC = ScoreCIC(
@@ -226,7 +226,7 @@ def main():
 
         (C, G_C), graph_score, scores = find_cdag(
             data, n_clus=args.n_clusters, score=score_CIC, steps=args.n_iters, logger=logging, desc=f'Run {i}')
-        C_mat = clustering_to_matrix(C, len(C))
+        C_mat = clustering_to_matrix(C)
 
         C_dummy = list(map(lambda x: {x}, range(len(C))))
 
