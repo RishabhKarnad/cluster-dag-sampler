@@ -68,6 +68,3 @@ class ClusterLinearGaussianNetwork:
         mean_expected = X@(G_expand*theta)
         Cov = get_covariance_for_clustering(C)
         return jnp.mean(stats.multivariate_normal.logpdf(X, mean_expected, Cov))
-
-    def pmf(self, X, theta, C, G):
-        return jnp.exp(self.logpmf(X, theta, C, G))

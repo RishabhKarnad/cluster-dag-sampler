@@ -12,9 +12,6 @@ class SparseDAGDistribution:
         self.gibbs_temp = gibbs_temp
         self.sparsity_factor = sparsity_factor
 
-    def pmf(self, G):
-        return np.exp(self.logpmf(G))
-
     def logpmf(self, G):
         dagness = h(G)
         return -self.gibbs_temp*dagness - self.sparsity_factor*G.sum()

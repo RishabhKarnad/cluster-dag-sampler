@@ -25,9 +25,6 @@ class CDAGJointDistribution:
         self.graph_prior = graph_prior
         self.likelihood = likelihood
 
-    def pmf(self, C, G, X, theta):
-        return np.exp(self.logpmf(C, G, X, theta))
-
     def logpmf(self, C, G, X, theta):
         k = len(C)
         C_mat = clustering_to_matrix(C)

@@ -36,13 +36,14 @@ def parse_args():
     ])
 
     parser.add_argument('--n_data_samples', type=int)
+
     parser.add_argument('--n_mcmc_samples', type=int, default=5000)
     parser.add_argument('--n_mcmc_warmup', type=int, default=1000)
-
     parser.add_argument('--num_chains', type=int, default=1)
 
     parser.add_argument('--max_em_iters', type=int, default=10)
     parser.add_argument('--max_mle_iters', type=int, default=100)
+
     parser.add_argument('--min_clusters', type=int, default=None)
     parser.add_argument('--max_clusters', type=int, default=None)
 
@@ -58,8 +59,6 @@ def evaluate_samples(*, C_true, G_true, samples, scores, theta, theta_true, data
         map(lambda x: clustering_to_matrix(x[0]), samples))
 
     C_true = clustering_to_matrix(C_true)
-
-    # G_expanded = C_true@G_true@C_true.T
 
     rand_index_mean, rand_index_stddev = expected_rand_index(C_true, C_samples)
     logging.info(f'Rand-index: {rand_index_mean}+-{rand_index_stddev}')

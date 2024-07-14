@@ -9,9 +9,6 @@ class ClusteringDistribution:
         self.alpha = alpha
         self.lambda_s = lambda_s
 
-    def pmf(self, C):
-        return np.exp(self.logpmf(C))
-
     def logpmf(self, C):
         return self.lambda_s * np.prod(np.tanh(self.alpha * np.sum(C, axis=0)))
 
